@@ -1,0 +1,360 @@
+SIMULATION_WORLD
+{
+	// simulation properties
+	dt = 0.00001
+	max_dt = 130
+	num_substeps = 1
+	
+	CFL = 0.8
+	frame_rate = 30
+	
+	// simulation options
+	use_eulerian_solver	= true
+	use_sph_solver		= false
+	use_solid_solver	= false
+	use_sph_levelset	= false
+
+	number_of_threads = 16
+
+	use_field_boundary = false
+	field_boundary_left = false
+	field_boundary_right = false
+	field_boundary_bottom = false
+	field_boundary_back = false
+	field_boundary_front = false
+	field_boundary_top = false
+
+	auto_capture = true
+	auto_video = true
+	auto_delete_image = false
+	last_frame = 300000
+	
+	air_water_simulation = false
+	oil_water_simulation = true
+	
+	// A_0 : amplitude, alpha : 2*pi/lambda, a : dimensionless ratio, R2 : radius of pipe
+	a = 1.61
+	R2 = 0.47625
+	A_0 = 0.1
+	alpha = 2.4
+	
+	WORLD_DISCRETIZATION_AIR_WATER
+	{
+		large_bubble = true
+		small_bubble = false
+
+		GRID_STRUCTURE_3D_LARGE
+		{
+			resolution_scale = 1
+
+			start_indices = (0,0,0)
+			base_grid_resolution = (41, 61, 41)
+			base_grid_min = ( -1, -1, -1)
+			base_grid_max = ( 1, 2, 1)
+		}
+
+		GRID_STRUCTURE_3D_SMALL
+		{
+			resolution_scale = 1
+
+			start_indices = (0,0,0)
+			base_grid_resolution = (40, 60, 40)
+			base_grid_min = ( -0.01, -0.01,  -0.01)
+			base_grid_max = ( 0.01,  0.02,  0.01)
+		}
+
+		padding_width = 2
+	}
+	
+	WORLD_DISCRETIZATION_OIL_WATER
+	{
+		PIPE_OPTIONS
+		{
+			is_vertical = true
+			is_parallel = false
+		}
+	
+		GRID_STRUCTURE_3D_VERTICAL
+		{
+			resolution_scale = 1
+
+			start_indices = (0,0,0)
+			base_grid_resolution = (71, 51, 71)
+			base_grid_min = ( -1.8326, 0, -1.8326)
+			base_grid_max = ( 1.8326, 2.618, 1.8326)
+		}
+
+		GRID_STRUCTURE_3D_PARALLEL
+		{
+			resolution_scale = 1
+
+			start_indices = (0,0,0)
+			base_grid_resolution = (51, 51, 51)
+			base_grid_min = ( 0, -1.570796, -1.570796)
+			base_grid_max = ( 3.141592, 1.570796, 1.570796)
+		}
+		padding_width = 2
+	}
+	
+	LOG
+	{
+		max_log_level = 1
+		use_log_file = false
+		display_accum_time = true
+		use_log_screen = true
+		output_log_file_name= "log.txt"
+	}
+}
+
+FLUID_SOLVER_UNIFORM_AIR_WATER
+{
+	use_water_solver = true
+	use_air_solver = false
+	use_smoke_density = false
+	
+	is_Levelset_advection_active = true
+	is_Velocity_advection_active = true
+	is_external_force_active = true
+	is_sourcing_active = true
+	is_projection_active = true
+
+	fastsweeping_reinitialization = false
+	sussmanstyle_reinitialization = true
+	
+	scaling_number_for_reinitialization = 5
+	iteration_number_for_reinitialization = 25
+	
+	use_delta_function_formulation = true
+	
+	curvature_by_normal_vector = false
+	curvature_by_levelset = true
+	
+	CSF_model = false
+	
+	use_rk_3rd = false
+
+	LEVELSET_ADVECTION
+	{
+		use_maccormack = false
+		use_bfecc = false
+		use_fbecc = false
+		use_csl = false
+		use_5th_weno = true
+		use_3rd_eno = false
+		epsilon = 0.000001
+	}
+		
+	VELOCITY_ADVECTION
+	{
+		use_5th_weno_v = false
+		use_3rd_eno_v = true
+
+
+		epsilon = 0.000001
+	}	
+	
+	PROJECTION_WATER
+	{			
+		tolerance = 0.00001
+		max_iteration = 10000
+
+		air_bubble_rising = true
+		water_drop = false
+
+		minimum_x_res = 128
+
+		num_pre_smoothing = 20
+		num_post_smoothing = 20
+
+		use_previous_pressure = true
+
+		poisson_solver_type = "PCG"
+		//MULTIGRID, CG, PCG, HYBRID, GS, CUDAPCG, CUDACG
+
+   		use_multilevel_method = false
+		use_2nd_order = false
+		use_variable_density = true
+
+		artificial_viscosity = 1
+
+		Dirichlet_Boundary_Condition = false
+		Neumann_Boundary_Condition = true
+	}
+
+	ghost_width = 3
+	use_water_levelset = true
+	
+	gravity = (0, -9.8 ,0)
+
+	water_viscosity = 0.001137
+	water_density = 1000
+	surface_tension = 0.0728
+	air_viscosity = 0.0000178
+	air_density = 1.226
+}
+
+FLUID_SOLVER_UNIFORM_OIL_WATER
+{
+	use_water_solver = true
+		
+	is_Levelset_advection_active = true
+	is_Velocity_advection_active = true
+	is_external_force_active = true
+	is_sourcing_active = true
+	is_projection_active = true
+
+	fastsweeping_reinitialization = false
+	sussmanstyle_reinitialization = true
+	
+	scaling_number_for_reinitialization = 2
+	iteration_number_for_reinitialization = 10
+	
+	use_delta_function_formulation = true
+	
+	curvature_by_normal_vector = false
+	curvature_by_levelset = true
+	
+	order_for_time_advancing = 2
+	
+	semi_implicit_approach = true
+	dimensionless_form = true
+	
+	CSF_model = false
+		
+	is_periodic = true
+	periodic_num = 5
+	
+	// Simulation Properties
+	m = 0.00166
+	eta = 1.1
+	K = -2.03030303
+	g = -980
+	J = 0.063354
+		
+	LEVELSET_ADVECTION
+	{
+		use_maccormack = false
+		use_bfecc = false
+		use_fbecc = false
+		use_csl = false
+		use_5th_weno = true
+		use_3rd_eno = false
+		epsilon = 0.000001
+	}
+		
+	VELOCITY_ADVECTION
+	{
+		use_5th_weno_v = false
+		use_3rd_eno_v = true
+
+		epsilon = 0.000001
+	}	
+	
+	PROJECTION_WATER
+	{			
+		tolerance = 0.000001
+		max_iteration = 10000
+
+		minimum_x_res = 128
+
+		num_pre_smoothing = 20
+		num_post_smoothing = 20
+
+		use_previous_pressure = true
+
+		poisson_solver_type = "PCG"
+		//MULTIGRID, CG, PCG, HYBRID, GS, CUDAPCG, CUDACG
+
+   		use_multilevel_method = false
+		use_2nd_order = false
+		use_variable_density = true
+
+		artificial_viscosity = 1
+
+		Dirichlet_Boundary_Condition = false
+		Neumann_Boundary_Condition = true
+		
+		regular_boundary = false
+		cylindrical_boundary = true
+	}
+
+	ghost_width = 3
+	use_water_levelset = true
+	
+	gravity = (0, -980 ,0)
+
+	water_viscosity = 0.01
+	water_density = 0.995
+	surface_tension = 8.54
+	oil_density = 0.905
+	oil_viscosity = 6.01
+}
+
+RIGID_BODY_SOLVER
+{
+	gravity = (0, -1, 0)
+}
+
+OBJECT_LIST
+{
+	WATER
+	{
+		object_type = "FLUID"
+		shape_type = "WATER"
+
+		use_sea_surface = false
+		height = 0
+		
+		// See as a bubble
+		use_sphere_bubble = false
+		position = (0, 0, 0)
+		size = 0.3333
+		velocity = (0, 0, 0)					
+		
+		// User defined
+		user_defined = false
+		discretize = false
+
+		FLUID_CONTROL_OPTIONS
+		{
+			source_density = false
+			source_velocity = false
+			source_levelset = false
+		}
+
+		SPH_CONTROL_OPTIONS
+		{
+			source_sph_particles = false
+			source_min_velocity = 0
+			no_penetration = false
+			ghost_particle = false
+			sph_pressure_coef = 1
+			remove_particles = false
+			narrow_band_size = -4
+		}
+	}
+
+	//SOURCE_SPHERE
+	{
+		object_type = "FLUID"
+		shape_type = "SPHERE"
+		position = (0.5,0.5,0.5)
+		size = 0.1
+		velocity = (0, -1, 0)
+
+		stop_time = 0.0001
+
+		SPH_CONTROL_OPTIONS
+		{
+			source_sph_particles = false	
+		}
+
+		FLUID_CONTROL_OPTIONS
+		{
+			source_density = false
+			source_velocity = true
+			source_levelset = true
+			no_penetration = false
+		}
+	}
+}

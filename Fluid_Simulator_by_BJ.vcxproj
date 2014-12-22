@@ -1,0 +1,295 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{85180459-B008-4D66-B3F3-CDF64675CE5B}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>Fluid_Simulator_by_BJ</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v110</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v110</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v110</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v110</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <IncludePath>$(IncludePath)</IncludePath>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;FBXSDK_NEW_API;FBXSDK_SHARED;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_WIN32_WINNT=0x0501</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\User\Desktop\Own_Simulator\Fluid_Simulator_by_BJ\Fluid_Simulator_by_BJ\3rdparty\zlib-1.2.5\include;C:\Users\User\Desktop\Own_Simulator\Fluid_Simulator_by_BJ\Fluid_Simulator_by_BJ\3rdparty\libpng-1.5.7\include;D:\boost_1_53_0\boost_1_53_0;E:\SSD데이터\Users\LeeBJ\Desktop\Own_Simulator\Fluid_Simulator_by_BJ\Fluid_Simulator_by_BJ\3rdparty\freetype-2.4.8\include;E:\SSD데이터\Users\LeeBJ\Desktop\Own_Simulator\Fluid_Simulator_by_BJ\Fluid_Simulator_by_BJ\3rdparty\ftgl-2.1.3.rc5\include;E:\SSD데이터\Users\LeeBJ\Desktop\Own_Simulator\Fluid_Simulator_by_BJ\Fluid_Simulator_by_BJ\3rdparty\cg-3.1\include;E:\SSD데이터\Users\LeeBJ\Desktop\Own_Simulator\Fluid_Simulator_by_BJ\Fluid_Simulator_by_BJ\3rdparty\glew-1.7.0\include\GL;E:\SSD데이터\Users\LeeBJ\Desktop\Own_Simulator\Fluid_Simulator_by_BJ\Fluid_Simulator_by_BJ\3rdparty\glut64\include;E:\SSD데이터\Users\LeeBJ\Desktop\Own_Simulator\Fluid_Simulator_by_BJ\Fluid_Simulator_by_BJ\3rdparty\nvWidget\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <DisableSpecificWarnings>4996</DisableSpecificWarnings>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalLibraryDirectories>C:\Users\User\Desktop\Own_Simulator\Fluid_Simulator_by_BJ\Fluid_Simulator_by_BJ\3rdparty\zlib-1.2.5\lib;C:\Users\User\Desktop\Own_Simulator\Fluid_Simulator_by_BJ\Fluid_Simulator_by_BJ\3rdparty\libpng-1.5.7\lib;E:\SSD데이터\Users\LeeBJ\Desktop\Own_Simulator\Fluid_Simulator_by_BJ\Fluid_Simulator_by_BJ\3rdparty\freetype-2.4.8\lib;E:\SSD데이터\Users\LeeBJ\Desktop\Own_Simulator\Fluid_Simulator_by_BJ\Fluid_Simulator_by_BJ\3rdparty\ftgl-2.1.3.rc5\lib;E:\SSD데이터\Users\LeeBJ\Desktop\Own_Simulator\Fluid_Simulator_by_BJ\Fluid_Simulator_by_BJ\3rdparty\cg-3.1\lib;D:\boost_1_53_0\boost_1_53_0\stage64\lib;E:\SSD데이터\Users\LeeBJ\Desktop\Own_Simulator\Fluid_Simulator_by_BJ\Fluid_Simulator_by_BJ\3rdparty\glew-1.7.0\lib;E:\SSD데이터\Users\LeeBJ\Desktop\Own_Simulator\Fluid_Simulator_by_BJ\Fluid_Simulator_by_BJ\3rdparty\nvWidget\lib;E:\SSD데이터\Users\LeeBJ\Desktop\Own_Simulator\Fluid_Simulator_by_BJ\Fluid_Simulator_by_BJ\3rdparty\glut64\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>cg.lib;cgGL.lib;nvWidgets.lib;glut64.lib;glew64.lib;freetype248MT.lib;ftgl.lib;libpng15.lib;zlibstat.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreSpecificDefaultLibraries>msvcrt.lib;msvcprt.lib</IgnoreSpecificDefaultLibraries>
+      <LinkTimeCodeGeneration />
+      <Profile>true</Profile>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="ADVECTION_3D.h" />
+    <ClInclude Include="ADVECTION_METHOD_3D.h" />
+    <ClInclude Include="ARRAY.h" />
+    <ClInclude Include="ARRAY_2D.h" />
+    <ClInclude Include="ARRAY_3D.h" />
+    <ClInclude Include="ARRAY_VECTOR3.h" />
+    <ClInclude Include="BOX.h" />
+    <ClInclude Include="CAPTURE_MANAGER.h" />
+    <ClInclude Include="CG_METHOD.h" />
+    <ClInclude Include="COMMON_DEFINITIONS.h" />
+    <ClInclude Include="CSR_MATRIX.h" />
+    <ClInclude Include="CYLINDER.h" />
+    <ClInclude Include="DYNAMIC_ARRAY.h" />
+    <ClInclude Include="EULERIAN_FLUID_SOLVER_3D.h" />
+    <ClInclude Include="FIELD_STRUCTURE_2D.h" />
+    <ClInclude Include="FIELD_STRUCTURE_3D.h" />
+    <ClInclude Include="FILE_UTILITIES.h" />
+    <ClInclude Include="FLUID_CONTROL_OPTIONS.h" />
+    <ClInclude Include="GAUSS_SEIDEL_METHOD.h" />
+    <ClInclude Include="GRID_STRUCTURE_2D.h" />
+    <ClInclude Include="GRID_STRUCTURE_3D.h" />
+    <ClInclude Include="GS_COEFFICIENTS.h" />
+    <ClInclude Include="LEVELSET_3D.h" />
+    <ClInclude Include="LEVELSET_OBJECT.h" />
+    <ClInclude Include="LINEAR_SOLVER.h" />
+    <ClInclude Include="LOG.h" />
+    <ClInclude Include="MACROS.h" />
+    <ClInclude Include="MAC_GRID_STRUCTURE_3D.h" />
+    <ClInclude Include="MARCHING_CUBES_ALGORITHM.h" />
+    <ClInclude Include="MARCHING_CUBES_ALGORITHM_TABLE.h" />
+    <ClInclude Include="MATERIAL_POINT_3D.h" />
+    <ClInclude Include="MATRIX_3X3.h" />
+    <ClInclude Include="MATRIX_MXN.h" />
+    <ClInclude Include="MATRIX_NXN.h" />
+    <ClInclude Include="MOVING_LEAST_SQUARES.h" />
+    <ClInclude Include="MULTITHREADING.h" />
+    <ClInclude Include="MULTI_PROJECTION_BASE.h" />
+    <ClInclude Include="OPENGL_2D_TEXT.h" />
+    <ClInclude Include="OPENGL_CG_VOLUME.h" />
+    <ClInclude Include="OPENGL_COMMON.h" />
+    <ClInclude Include="OPENGL_DRIVER.h" />
+    <ClInclude Include="OPENGL_EULERIAN_FLUID_SOLVER.h" />
+    <ClInclude Include="OPENGL_GLUT_CAMERA.h" />
+    <ClInclude Include="OPENGL_LEVELSET.h" />
+    <ClInclude Include="OPENGL_LIGHT_MANAGER.h" />
+    <ClInclude Include="OPENGL_OBJECT_BASE.h" />
+    <ClInclude Include="OPENGL_SCALARFIELD.h" />
+    <ClInclude Include="OPENGL_SOLVER_BASE.h" />
+    <ClInclude Include="OPENGL_VECTORFIELD.h" />
+    <ClInclude Include="OPENGL_WORLD.h" />
+    <ClInclude Include="PCG_METHOD.h" />
+    <ClInclude Include="PLANE.h" />
+    <ClInclude Include="POISSON_SOLVER_3D.h" />
+    <ClInclude Include="PROJECTION_3D.h" />
+    <ClInclude Include="PROJECT_INFO.h" />
+    <ClInclude Include="QUATERNION.h" />
+    <ClInclude Include="read_write_png.h" />
+    <ClInclude Include="RIGID_OBJECT.h" />
+    <ClInclude Include="SCAN_LINE_ALGORITHM.h" />
+    <ClInclude Include="SCRIPT_READER.h" />
+    <ClInclude Include="SIMULATION_MANAGER.h" />
+    <ClInclude Include="SIMULATION_OBJECT.h" />
+    <ClInclude Include="SIMULATION_WORLD.h" />
+    <ClInclude Include="SPHERE.h" />
+    <ClInclude Include="STATIC_OBJECT.h" />
+    <ClInclude Include="stdafx.h" />
+    <ClInclude Include="targetver.h" />
+    <ClInclude Include="TRIANGULAR_SURFACE.h" />
+    <ClInclude Include="VECTOR_2D.h" />
+    <ClInclude Include="VECTOR_3D.h" />
+    <ClInclude Include="VECTOR_ND.h" />
+    <ClInclude Include="VISCOSITY_3D.h" />
+    <ClInclude Include="WORLD_DISCRETIZATION_3D.h" />
+    <ClInclude Include="WRITE_LEVELSET.h" />
+    <ClInclude Include="WRITE_OBJECT_BASE.h" />
+    <ClInclude Include="WRITE_WORLD.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="ADVECTION_3D.cpp" />
+    <ClCompile Include="ADVECTION_METHOD_3D.cpp" />
+    <ClCompile Include="ARRAY_2D.cpp" />
+    <ClCompile Include="ARRAY_3D.cpp" />
+    <ClCompile Include="ARRAY_VECTOR3.cpp" />
+    <ClCompile Include="CAPTURE_MANAGER.cpp" />
+    <ClCompile Include="CG_METHOD.cpp" />
+    <ClCompile Include="CSR_MATRIX.cpp" />
+    <ClCompile Include="DYNAMIC_ARRAY.cpp" />
+    <ClCompile Include="EULERIAN_FLUID_SOLVER_3D.cpp" />
+    <ClCompile Include="FIELD_STRUCTURE_2D.cpp" />
+    <ClCompile Include="FIELD_STRUCTURE_3D.cpp" />
+    <ClCompile Include="FILE_UTILITIES.cpp" />
+    <ClCompile Include="GAUSS_SEIDEL_METHOD.cpp" />
+    <ClCompile Include="GRID_STRUCTURE_2D.cpp" />
+    <ClCompile Include="GRID_STRUCTURE_3D.cpp" />
+    <ClCompile Include="LEVELSET_3D.cpp" />
+    <ClCompile Include="LINEAR_SOLVER.cpp" />
+    <ClCompile Include="LOG.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="MARCHING_CUBES_ALGORITHM.cpp" />
+    <ClCompile Include="MATRIX_3X3.cpp" />
+    <ClCompile Include="MOVING_LEAST_SQUARES.cpp" />
+    <ClCompile Include="MULTITHREADING.cpp" />
+    <ClCompile Include="MULTI_PROJECTION_BASE.cpp" />
+    <ClCompile Include="OPENGL_2D_TEXT.cpp" />
+    <ClCompile Include="OPENGL_CG_VOLUME.cpp" />
+    <ClCompile Include="OPENGL_COMMON.cpp" />
+    <ClCompile Include="OPENGL_DRIVER.cpp" />
+    <ClCompile Include="OPENGL_EULERIAN_FLUID_SOLVER.cpp" />
+    <ClCompile Include="OPENGL_GLUT_CAMERA.cpp" />
+    <ClCompile Include="OPENGL_LEVELSET.cpp" />
+    <ClCompile Include="OPENGL_LIGHT_MANAGER.cpp" />
+    <ClCompile Include="OPENGL_OBJECT_BASE.cpp" />
+    <ClCompile Include="OPENGL_SCALARFIELD.cpp" />
+    <ClCompile Include="OPENGL_SOLVER_BASE.cpp" />
+    <ClCompile Include="OPENGL_VECTORFIELD.cpp" />
+    <ClCompile Include="OPENGL_WORLD.cpp" />
+    <ClCompile Include="PCG_METHOD.cpp" />
+    <ClCompile Include="POISSON_SOLVER_3D.cpp" />
+    <ClCompile Include="PROJECTION_3D.cpp" />
+    <ClCompile Include="PROJECT_INFO.cpp" />
+    <ClCompile Include="QUATERNION.cpp" />
+    <ClCompile Include="RIGID_OBJECT.cpp" />
+    <ClCompile Include="SCRIPT_READER.cpp" />
+    <ClCompile Include="SIMULATION_MANAGER.cpp" />
+    <ClCompile Include="SIMULATION_OBJECT.cpp" />
+    <ClCompile Include="SIMULATION_WORLD.cpp" />
+    <ClCompile Include="TRIANGULAR_SURFACE.cpp" />
+    <ClCompile Include="VECTOR_2D.cpp" />
+    <ClCompile Include="VECTOR_3D.cpp" />
+    <ClCompile Include="VECTOR_ND.cpp" />
+    <ClCompile Include="VISCOSITY_3D.cpp" />
+    <ClCompile Include="WORLD_DISCRETIZATION_3D.cpp" />
+    <ClCompile Include="WRITE_LEVELSET.cpp" />
+    <ClCompile Include="WRITE_OBJECT_BASE.cpp" />
+    <ClCompile Include="WRITE_WORLD.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

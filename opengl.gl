@@ -1,0 +1,239 @@
+
+OPENGL_WORLD
+{
+	light_draw_for_debug = false
+	add_default_point_lights = true
+	
+	BACKGROUND
+	{
+		upper_color = (1.0, 1.0, 1.0)
+		lower_color = (0.69, 0.7686274, 0.8671875)
+	}
+	
+	ANTI_ALISING
+	{
+		use_multisample = true
+		use_line_smooth = false
+		use_point_smooth = false
+	}
+	
+	OPENGL_LIGHT_OBJECT
+	{
+		light_type = "DIRECTIONAL"
+		direction = (1.0, -0.5, 1.0)
+		
+		ambient_color = (0.0, 0.0, 0.0)
+		diffuse_color = (0.7, 0.7, 0.7)
+		specular_color = (0.2, 0.2, 0.2)
+		
+		constant_attenuation = 1
+		linear_attenuation = 0.0
+		quadratic_attenuation = 0.0		
+	}
+	
+	OPENGL_LIGHT_OBJECT
+	{
+		light_type = "DIRECTIONAL"
+		direction = (-1.0, -0.5, 1.0)
+		
+		ambient_color = (0.1, 0.1, 0.1)
+		diffuse_color = (0.7, 0.7, 0.7)
+		specular_color = (0.2, 0.2, 0.2)
+		
+		constant_attenuation = 1
+		linear_attenuation = 0.0
+		quadratic_attenuation = 0.0		
+	}
+	
+//	OPENGL_LIGHT_OBJECT
+	{
+		light_type = "POINT"
+		position = (0.0, 1.0, 1.0)
+		
+		ambient_color = (0.0, 0.0, 0.0)
+		diffuse_color = (1.0, 1.0, 1.0)
+		specular_color = (1.0, 1.0, 1.0)
+		
+		constant_attenuation = 2.4
+		linear_attenuation = 0.0
+		quadratic_attenuation = 0.0
+	}
+	
+//	OPENGL_LIGHT_OBJECT
+	{
+		light_type = "POINT"
+		position = (1.0, 1.0, 1.0)
+		
+		ambient_color = (0.0, 0.0, 0.0)
+		diffuse_color = (1.0, 1.0, 1.0)
+		specular_color = (1.0, 1.0, 1.0)
+		
+		constant_attenuation = 2.4
+		linear_attenuation = 0.0
+		quadratic_attenuation = 0.0
+	}
+	
+//	OPENGL_LIGHT_OBJECT
+	{
+		light_type = "SPOT"
+		position = (-1.0, 1.0, -1.0)
+		direction = (1.0, -1.0, 1.0)
+		
+		ambient_color = (0.2, 0.2, 0.2)
+		diffuse_color = (1.0, 1.0, 1.0)
+		specular_color = (1.0, 1.0, 1.0)
+		
+		spot_exponent = 2.0
+		spot_cutoff = 60.0
+		
+		constant_attenuation = 1.0
+		linear_attenuation = 0.0
+		quadratic_attenuation = 0.0		
+	}
+	
+//	OPENGL_LIGHT_OBJECT
+	{
+		light_type = "SPOT"
+		position = (1.0, 1.0, 1.0)
+		direction = (-1.0, -1.0, -1.0)
+		
+		ambient_color = (0.2, 0.2, 0.2)
+		diffuse_color = (1.0, 1.0, 1.0)
+		specular_color = (1.0, 1.0, 1.0)
+		
+		spot_exponent = 2.0
+		spot_cutoff = 60.0
+		
+		constant_attenuation = 1.0
+		linear_attenuation = 0.0
+		quadratic_attenuation = 0.0		
+	}
+	
+	OPENGL_RIGID_OBJECT_SOLVER
+	{
+		RIGID_BODY
+		{
+			solid_material_name = "WHITE_RUBBER"
+		//	or
+		//	solid_ambient_color = (0.19225, 0.19225, 0.19225)
+		//	solid_diffuse_color = (0.50754, 0.50754, 0.50754)
+		//	solid_specular_color = (0.508273, 0.508273, 0.508273)
+		//	solid_shininess = 0.4
+		}
+	}
+	
+	OPENGL_DEFORMABLE_OBJECT_SOLVER
+	{
+		DEFORMABLE
+		{
+			solid_material_name = "RUBY"
+		}
+	}
+
+	OPENGL_SPH_SOLVER
+	{
+		SPH_PARTICLE
+		{
+			use_default_particle_radius = false	// true: radius = dx*0.5, false: use sphere_radius and 2dcircle_radius
+			
+			particle_point_size = 1.0		// for point drawing
+			
+			sphere_detail_level = 5		// for sphere drawing
+			sphere_radius = 0.001		// for sphere drawing
+			
+			circle_detail_level = 10	// for 2d_circle drawing
+			circle_radius = 0.001		// for 2d_circle drawing
+			
+			particle_velocity_length_scale = 0.1	// for particle velocity-line drawing
+			
+			particle_color = (0.1, 0.1, 1.0) 	// for point/2d_circle/velocity-line drawing
+			
+		//	particle_material_name = "CYAN_PLASTIC"
+		//	or		
+			particle_ambient_color = (0.2, 0.2, 0.2)
+			particle_diffuse_color = (0.2, 0.2, 1.0)
+			particle_specular_color = (0.15, 0.17, 0.85)
+			particle_shininess = 0.2
+		}
+	}
+	
+	OPENGL_HYBRID_FLUID_SOLVER
+	{
+		SPLASH_PARTICLES
+		{
+			particle_point_size = 1.0
+			
+			sphere_detail_level = 5	
+			sphere_radius = 0.001
+			
+			circle_detail_level = 10
+			circle_radius = 0.001
+			
+			particle_velocity_length_scale = 0.5
+			
+			particle_color = (1.0, 0.65, 0.65)
+					
+		//	particle_material_name = "PEARL"
+		//  or	
+			particle_ambient_color = (0.1, 0.1, 0.1)
+			particle_diffuse_color = (0.7, 0.7, 0.9)
+			particle_specular_color = (0.3, 0.3, 0.5)
+			particle_shininess = 0.2
+		}
+		
+		FOAM_PARTICLES
+		{
+			particle_point_size = 1.0
+			
+			sphere_detail_level = 5
+			sphere_radius = 0.001
+			
+			circle_detail_level = 10
+			circle_radius = 0.001
+			
+			particle_velocity_length_scale = 0.5
+			
+			particle_color = (1.0, 1.0, 1.0)
+					
+			particle_material_name = "BRIGHT_WHITE"
+		}
+	}
+	
+	OPENGL_EULERIAN_FLUID_SOLVER
+	{
+		WATER_LEVELSET
+		{
+			solid_material_name = "CHROME"
+		//	or
+		//	solid_ambient_color = (0.19225, 0.19225, 0.19225)
+		//	solid_diffuse_color = (0.50754, 0.50754, 0.50754)
+		//	solid_specular_color = (0.508273, 0.508273, 0.508273)
+		//	solid_shininess = 0.4
+		}
+		
+		BOUNDARY_LEVELSET
+		{
+			solid_material_name = "CYAN_PLASTIC_TRANSPARENT"
+		//	or
+		//	solid_ambient_color = (0.19225, 0.19225, 0.19225)
+		//	solid_diffuse_color = (0.50754, 0.50754, 0.50754)
+		//	solid_specular_color = (0.508273, 0.508273, 0.508273)
+		//	solid_shininess = 0.4
+		}	
+		SMOKE_DENSITY_FIELD
+		{
+			cg_density = 0.1
+			cg_brightness = 4.0
+		}
+	}
+}
+
+
+// COLOR NAMES
+//	"BRASS",	"BRONZE",	"POLISHED_BRONZE",	"CHROME",	"COPPER",
+//	"POLISHED_COPPER",	"GOLD",	"POLISHED_GOLD", "TIN", "SILVER", 
+// 	"POLISHED_SILVER", 	"EMERALD", 	"JADE", 	"OBSIDIAN",	"PEARL",
+//	"RUBY",	"TURQUOISE",	"BLACK_PLASTIC",	"CYAN_PLASTIC",	"GREEN_PLASTIC",
+//	"RED_PLASTIC", 	"WHITE_PLASTIC",	"YELLOW_PLASTIC",	"BLACK_RUBBER",	"CYAN_RUBBER",
+// 	"GREEN_RUBBER",	"RED_RUBBER",	"WHITE_RUBBER",	"YELLOW_RUBBER",	"BRIGHT_WHITE",
+// 	"LESS_BRIGHT_WHITE",	"WARM_WHITE",	"COOL_WHITE",
