@@ -122,10 +122,10 @@ public: // Initialization Function
 	// Need to be updated 
 	//void InitializeFromBlock(const SCRIPT_BLOCK& block)
 	//{
-	//	VI start = block.GetInt3("start_indices");
-	//	VI res = block.GetInt3("base_grid_resolution");
-	//	VT min = block.GetVector3("base_grid_min");
-	//	VT max = block.GetVector3("base_grid_max");
+	//	VI2 start = block.GetInt3("start_indices");
+	//	VI2 res = block.GetInt3("base_grid_resolution");
+	//	VT2 min = block.GetVector3("base_grid_min");
+	//	VT2 max = block.GetVector3("base_grid_max");
 
 	//	Initialize(res.i, res.j, start.i, start.j, min.i, min.j, max.i, max.j);
 	//}
@@ -137,14 +137,14 @@ public: // Operator Overloading
 	}
 
 public: // Indexing Functions
-	inline const VI ClampedIndex(const int& i, const int& j) const
+	inline const VI2 ClampedIndex(const int& i, const int& j) const
 	{
-		return VI(CLAMP(i, i_start, i_end), CLAMP(j, j_start, j_end), 0);
+		return VI2(CLAMP(i, i_start, i_end), CLAMP(j, j_start, j_end));
 	}
 
-	inline const VI ClampedIndex(const VI& ix) const
+	inline const VI2 ClampedIndex(const VI2& ix) const
 	{
-		return VI(CLAMP(ix.i, i_start, i_end), CLAMP(ix.j, j_start, j_end), 0);
+		return VI2(CLAMP(ix.i, i_start, i_end), CLAMP(ix.j, j_start, j_end));
 	}
 
 	inline const int Index1D(const int& i, const int& j) const
@@ -163,37 +163,35 @@ public: // Indexing Functions
 	}
 
 public: // Functions for the grid properties
-	inline const VT CellCenter(const int& i, const int& j) const
+	inline const VT2 CellCenter(const int& i, const int& j) const
 	{
-		return VT(x_min + ((T)0.5 + (T)(i - i_start))*dx, y_min + ((T)0.5 + (T)(j - j_start))*dy, 0);
+		return VT2(x_min + ((T)0.5 + (T)(i - i_start))*dx, y_min + ((T)0.5 + (T)(j - j_start))*dy);
 	}
 
-	inline const VT CellCenter(const VI& ix) const
+	inline const VT2 CellCenter(const VI2& ix) const
 	{
-		return VT(x_min + ((T)0.5 + (T)(ix.i - i_start))*dx, y_min + ((T)0.5 + (T)(ix.j - j_start))*dy, 0);
+		return VT2(x_min + ((T)0.5 + (T)(ix.i - i_start))*dx, y_min + ((T)0.5 + (T)(ix.j - j_start))*dy);
 	}
 
-	inline void Center(const int& i, const int& j, VT& position) const
+	inline void Center(const int& i, const int& j, VT2& position) const
 	{
 		position.x = x_min + ((T)0.5 + (i - i_start))*dx;
 		position.y = y_min + ((T)0.5 + (j - j_start))*dy;
-		position.z = 0;
 	}
 
-	inline void Center(const VI& ix, VT& position) const 
+	inline void Center(const VI2& ix, VT2& position) const 
 	{
 		position.x = x_min + ((T)0.5 + (ix.i - i_start))*dx;
 		position.y = y_min + ((T)0.5 + (ix.j - j_start))*dy;
-		position.z = 0;
 	}
 
 	// Note that this one returns index containing the cell
-	inline const VI Cell(const VT& position) const		 
+	inline const VI2 Cell(const VT2& position) const		 
 	{
-		return VI((int)((position.x - x_min)*one_over_dx), (int)((position.y - y_min)*one_over_dy), 0);
+		return VI2((int)((position.x - x_min)*one_over_dx), (int)((position.y - y_min)*one_over_dy));
 	}
 
-	inline const void Cell(const VT& position, int& i, int& j) const
+	inline const void Cell(const VT2& position, int& i, int& j) const
 	{
 		i = (int)((position.x - x_min)*one_over_dx);
 		j = (int)((position.y - y_min)*one_over_dy);
@@ -202,9 +200,9 @@ public: // Functions for the grid properties
 		assert(j >= j_start && j <= j_end);
 	}
 
-	inline const VI ClampedCell(const VT& position) const
+	inline const VI2 ClampedCell(const VT2& position) const
 	{
-		VI index((int)((position.x - x_min)*one_over_dx), (int)((position.y - y_min)*one_over_dy), 0);
+		VI2 index((int)((position.x - x_min)*one_over_dx), (int)((position.y - y_min)*one_over_dy));
 
 		index.i = CLAMP(index.i, i_start, i_end);
 		index.j = CLAMP(index.j, j_start, j_end);
@@ -212,9 +210,9 @@ public: // Functions for the grid properties
 		return index;
 	}
 
-	inline const VI ClampedCell(const VT& position, VI& index) const
+	inline const VI2 ClampedCell(const VT2& position, VI2& index) const
 	{
-		index.Assign((int)((position.x - x_min)*one_over_dx), (int)((position.y - y_min)*one_over_dy), 0);
+		index.Assign((int)((position.x - x_min)*one_over_dx), (int)((position.y - y_min)*one_over_dy));
 
 		index.i = CLAMP(index.i, i_start, i_end);
 		index.j = CLAMP(index.j, j_start, j_end);
@@ -222,7 +220,7 @@ public: // Functions for the grid properties
 		return index;
 	}
 
-	inline const void ClampedCell(const VT& position, int& i, int& j) const
+	inline const void ClampedCell(const VT2& position, int& i, int& j) const
 	{
 		i = (int)((position.x - x_min)*one_over_dx);
 		j = (int)((position.y - y_min)*one_over_dy);
@@ -231,23 +229,23 @@ public: // Functions for the grid properties
 		j = CLAMP(j, j_start, j_end);
 	}
 
-	inline VI LeftBottomCell(const VT& position) const
+	inline VI2 LeftBottomCell(const VT2& position) const
 	{
-		return VI((int)((position.x - x_min)*one_over_dx - (T)0.5), (int)((position.y - y_min)*one_over_dy - (T)0.5), 0);
+		return VI2((int)((position.x - x_min)*one_over_dx - (T)0.5), (int)((position.y - y_min)*one_over_dy - (T)0.5));
 	}
 
-	inline void LeftBottomCell(const VT& position, int& i, int& j) const
+	inline void LeftBottomCell(const VT2& position, int& i, int& j) const
 	{
 		i = (int)((position.x - x_min)*one_over_dx - (T)0.5);
 		j = (int)((position.y - y_min)*one_over_dy - (T)0.5);
 	}
 
-	inline void LeftBottomCell(const VT& position, VI& ix) const
+	inline void LeftBottomCell(const VT2& position, VI2& ix) const
 	{
 		LeftBottomCell(position, ix.i, ix.j);
 	}
 
-	inline bool Inside(const VT& position) const
+	inline bool Inside(const VT2& position) const
 	{
 		if(position.x <= x_min) return false;
 		else if(position.x >= x_max) return false;
@@ -256,7 +254,7 @@ public: // Functions for the grid properties
 		return true;
 	}
 
-	inline bool Inside(const VT& position, const T& width) const
+	inline bool Inside(const VT2& position, const T& width) const
 	{
 		if(position.x <= x_min + width) return false;
 		else if(position.x >= x_max - width) return false;
@@ -274,7 +272,7 @@ public: // Functions for the grid properties
 		return true;
 	}
 
-	inline bool Inside(const VI& ix) const
+	inline bool Inside(const VI2& ix) const
 	{
 		if(ix.i < i_start) return false;
 		else if(ix.i > i_end) return false;
@@ -283,7 +281,7 @@ public: // Functions for the grid properties
 		return true;
 	}
 
-	inline bool Inside(const VI& ix, const int& inner_width) const
+	inline bool Inside(const VI2& ix, const int& inner_width) const
 	{
 		if(ix.i < i_start + inner_width) return false;
 		else if(ix.i > i_end - inner_width) return false;
@@ -316,7 +314,7 @@ public: // Functions for the grid properties
 		Initialize(i_res + 2*width, j_res + 2*width, i_start - width, j_start - width, x_min - (T)width*dx, y_min - (T)width*dy, x_max + (T)width*dx, y_max + (T)width*dy);
 	}
 
-	void Translate(const VT& variation) 
+	void Translate(const VT2& variation) 
 	{
 		x_min += variation.x;
 		y_min += variation.y;
@@ -325,8 +323,26 @@ public: // Functions for the grid properties
 		y_max += variation.y;
 	}
 
-public: // Function for multithreading - defined on the cpp file
-	void SplitInHeight(const int& num_threads, ARRAY<GRID_STRUCTURE_2D>& partial_grids);
+public: // Function for multithreading
+	void SplitInHeight(const int& num_threads, ARRAY<GRID_STRUCTURE_2D>& partial_grids)
+	{
+	    partial_grids.Initialize(num_threads);
+
+        const int quotient = j_res/num_threads;
+        const int remainder = j_res%num_threads;
+
+        int j_start_p = j_start;
+        T y_min_p = y_min;
+
+		for (int j = 0; j < num_threads; j++)
+		{
+            const int j_res_p = (j < remainder) ? (quotient + 1) : (quotient);
+            const T y_max_p = dy*(T)j_res_p + y_min_p;
+            partial_grids[j].Initialize(i_res, j_res_p, i_start, j_start_p, x_min, y_min_p, x_max, y_max_p);
+            j_start_p += j_res_p;
+            y_min_p = y_max_p;
+		}
+	}
 };
 
 // Ostream object overloading

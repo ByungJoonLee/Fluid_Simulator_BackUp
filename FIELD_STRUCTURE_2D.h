@@ -166,7 +166,7 @@ public: // Member Functions
 		return grid.CellCenter(i, j);
 	}
 
-	inline TT BiLinearInterpolation(const VT& pos) const
+	inline TT BiLinearInterpolation(const VT2& pos) const
 	{
 		// TODO: Clamp posx, posy, posz instead of clamping indices
 		const T &posx(pos.x), &posy(pos.y);
@@ -187,7 +187,7 @@ public: // Member Functions
 		return mamb*v00 + a*((T)1 - b)*v10 + b*((T)1 - a)*v01 + b*a*v11;
 	}
 
-	inline void PrepareBiLinearInterpolation(const VT& position, bool& inside, int& i0, int& j0, int& i1, int& j1, T& w00, T& w01, T& w10, T& w11) 
+	inline void PrepareBiLinearInterpolation(const VT2& position, bool& inside, int& i0, int& j0, int& i1, int& j1, T& w00, T& w01, T& w10, T& w11) 
 	{
 		T posx(position.x), posy(position.y);
 
@@ -219,7 +219,7 @@ public: // Member Functions
 		inside = true;
 	}
 	
-	inline TT BiLinearInterpolation(const VT& position, const TT& componentwise_min, const TT& componentwise_max)
+	inline TT BiLinearInterpolation(const VT2& position, const TT& componentwise_min, const TT& componentwise_max)
 	{
 		const T &posx(pos.x), &posy(pos.y);
 		

@@ -24,8 +24,11 @@ typedef double T;
 //typedef VECTOR_2D<T> VT;
 //typedef VECTOR_2D<int> VI;
 //#else
-typedef VECTOR_3D<T> VT;
+typedef VECTOR_3D<T>   VT;
 typedef VECTOR_3D<int> VI;
+
+typedef VECTOR_2D<T>   VT2;
+typedef VECTOR_2D<int> VI2;
 //#endif
 
 
