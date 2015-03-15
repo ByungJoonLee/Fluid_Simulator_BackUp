@@ -344,21 +344,19 @@ public: // Initialization Functions
 			}
 		}
 
-		switch (order_for_time_advancing)
+		if (order_for_time_advancing == 1)
 		{
-			case 1:
-				cout << "Time advancing: Forward Euler" << endl;
-
-			case 2:
-				cout << "Time advancing: Runge-Kutta 2nd" << endl;
-		
-			case 3:
-				cout << "Time advancing: Runge-Kutta 3rd" << endl;
-		
-			default:
-				cout << "Time advancing: Forward Euler" << endl;
+			cout << "Time advancing: Forward Euler" << endl;
 		}
-
+		if (order_for_time_advancing == 2)
+		{
+			cout << "Time advancing: Runge-Kutta 2nd" << endl;
+		}
+		if (order_for_time_advancing == 3)
+		{
+			cout << "Time advancing: Runge-Kutta 3rd" << endl;
+		}
+		
 		if (fastsweeping_reinitialization)
 		{
 			cout << "Reinitialized by Fast Sweeping Method: true" << endl;
@@ -807,7 +805,56 @@ public: // Advancing
 		ofstream fout;
 		if (order_for_time_advancing == 1)
 		{
-			Solve(thread_id, dt);
+			//Solve(thread_id, dt);
+			if (is_Levelset_advection_active)
+			{
+				BEGIN_HEAD_THREAD_WORK
+				{
+					temp_for_levelset.Initialize(multithreading, base_grid, 3);
+				}
+				END_HEAD_THREAD_WORK;
+
+				BEGIN_GRID_ITERATION_3D(partial_base_grids[thread_id])
+				{
+					T temp = water_levelset->arr(i, j, k);
+					temp_for_levelset(i, j, k) = temp;
+				}
+				END_GRID_ITERATION_3D;
+
+				Levelset_Advection(thread_id, dt);
+				Levelset_Advection(thread_id, dt);
+
+				BEGIN_GRID_ITERATION_3D(partial_base_grids[thread_id])
+				{
+					water_levelset->arr(i, j, k) = (T)0.5*(temp_for_levelset(i, j, k) + water_levelset->arr(i, j, k));
+				}
+				END_GRID_ITERATION_3D;
+			}
+
+			SolveForRK(thread_id, dt);
+
+			// Reinitialization using RK 2nd
+			BEGIN_HEAD_THREAD_WORK
+			{
+				temp_for_levelset.Initialize(multithreading, base_grid, 3);
+			}
+			END_HEAD_THREAD_WORK;
+
+			BEGIN_GRID_ITERATION_3D(partial_base_grids[thread_id])
+			{
+				T temp = water_levelset->arr(i, j, k);
+				temp_for_levelset(i, j, k) = temp;
+			}
+			END_GRID_ITERATION_3D;
+
+			Reinitialization(thread_id, dt);
+			Reinitialization(thread_id, dt);
+
+			BEGIN_GRID_ITERATION_3D(partial_base_grids[thread_id])
+			{
+				water_levelset->arr(i, j, k) = (T)0.5*(temp_for_levelset(i, j, k) + water_levelset->arr(i, j, k));
+			}
+			END_GRID_ITERATION_3D;
 		}
 		if (order_for_time_advancing == 2)
 		{

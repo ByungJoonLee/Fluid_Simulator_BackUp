@@ -65,6 +65,7 @@ public: // Options
 	
 	// Options for Boundary Condition
 	bool					levelset_advection, velocity_advection;
+	int						boundary_order_velocity;
 
 public: // Condition variable
 	T						epsilon, epsilon_v;
@@ -79,7 +80,8 @@ public: // Constructor and Desructor
 				 base_grid(water_levelset_input.grid), 
 				 water_signed_distance_field(water_levelset_input.signed_distance_field), pressure_field(0),
 				 air_water_simulation(false), oil_water_simulation(false),
-				 is_vertical(false), is_parallel(false)
+				 is_vertical(false), is_parallel(false),
+				 boundary_order_velocity((int)1)
 	{
 		water_signed_distance_field.is_scalar = true;
 		use_5th_weno = false;
@@ -106,6 +108,7 @@ public: // Initialization Function
 		use_5th_weno_v = advection_block_v.GetBoolean("use_5th_weno_v", false);
 		use_3rd_eno_v = advection_block_v.GetBoolean("use_3rd_eno_v", false);
 		epsilon_v = advection_block_v.GetFloat("epsilon", (T)10e-6);
+		boundary_order_velocity = advection_block_v.GetInteger("boundary_order_velocity", (int)1);
 
 		// Display
 		cout << "--------------LEVELSET_ADVECTION--------------" << endl;
@@ -157,6 +160,15 @@ public: // Initialization Function
 			cout << "use 3rd eno: " << "false" << endl;
 		}
 		
+		if (boundary_order_velocity == 1)
+		{
+			cout << "Order of velocity boundary: " << "1" << endl;
+		}
+		if (boundary_order_velocity == 2)
+		{
+			cout << "Order of velocity boundary: " << "2" << endl;
+		}
+
 		cout << "epsilon: " << epsilon_v << endl;
 
 		// For boundary condition of cylindrical pipe
@@ -699,12 +711,152 @@ public: // Member Functions
 					velocity_field_mac_ghost_z_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
 					velocity_field_mac_ghost_z_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
 
+					if (boundary_order_velocity == 1)
+					{
+						GRID_ITERATION_3D(boundary_phi_x.partial_grids[thread_id])
+						{
+							if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j + 1, k) > 0)
+							{
+								T theta = abs(boundary_phi_x(i, j, k))/(abs(boundary_phi_x(i, j + 1, k)) + abs(boundary_phi_x(i, j, k)));
+								velocity_field_mac_ghost_x_y(i, j + 1, k) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j, k);
+
+								for (int t = 2; t <= 4 ; t++)
+								{
+									velocity_field_mac_ghost_x_y(i, j + t, k) = pow(10*t,t); 
+								}
+							}
+							if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j - 1, k) > 0)
+							{
+								T theta = abs(boundary_phi_x(i, j, k))/(abs(boundary_phi_x(i, j - 1, k)) + abs(boundary_phi_x(i, j, k)));
+								velocity_field_mac_ghost_x_y(i, j - 1, k) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j, k);
+
+								for (int t = 2; t <= 4 ; t++)
+								{
+									velocity_field_mac_ghost_x_y(i, j - t, k) = pow(10*t,t);
+								}
+							}
+							if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j, k + 1) > 0)
+							{
+								T theta = abs(boundary_phi_x(i, j, k))/(abs(boundary_phi_x(i, j, k + 1)) + abs(boundary_phi_x(i, j, k)));
+								velocity_field_mac_ghost_x_z(i, j, k + 1) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j, k);
+
+								for (int t = 2; t <= 4 ; t++)
+								{
+									velocity_field_mac_ghost_x_z(i, j, k + t) = pow(10*t,t); 
+								}
+							}
+							if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j, k - 1) > 0)
+							{
+								T theta = abs(boundary_phi_x(i, j, k))/(abs(boundary_phi_x(i, j, k - 1)) + abs(boundary_phi_x(i, j, k)));
+								velocity_field_mac_ghost_x_z(i, j, k - 1) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j, k);
+
+								for (int t = 2; t <= 4 ; t++)
+								{
+									velocity_field_mac_ghost_x_z(i, j, k - t) = pow(10*t,t); 
+								}
+							}
+						}
+						multithreading.Sync(thread_id);
+
+						GRID_ITERATION_3D(boundary_phi_z.partial_grids[thread_id])
+						{
+							if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j + 1, k) > 0)
+							{
+								T theta = abs(boundary_phi_z(i, j, k))/(abs(boundary_phi_z(i, j + 1, k)) + abs(boundary_phi_z(i, j, k)));
+								velocity_field_mac_ghost_z_y(i, j + 1, k) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k);
+
+								for (int t = 2; t <= 4 ; t++)
+								{
+									velocity_field_mac_ghost_z_y(i, j + t, k) = pow(10*t,t); 
+								}
+							}
+							if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j - 1, k) > 0)
+							{
+								T theta = abs(boundary_phi_z(i, j, k))/(abs(boundary_phi_z(i, j - 1, k)) + abs(boundary_phi_z(i, j, k)));
+								velocity_field_mac_ghost_z_y(i, j - 1, k) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k);
+
+								for (int t = 2; t <= 4 ; t++)
+								{
+									velocity_field_mac_ghost_z_y(i, j - t, k) = pow(10*t,t);
+								}
+							}
+							if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j, k + 1) > 0)
+							{
+								T theta = abs(boundary_phi_z(i, j, k))/(abs(boundary_phi_z(i, j, k + 1)) + abs(boundary_phi_z(i, j, k)));
+								velocity_field_mac_ghost_z_z(i, j, k + 1) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k);
+
+								for (int t = 2; t <= 4 ; t++)
+								{
+									velocity_field_mac_ghost_z_z(i, j, k + t) = pow(10*t,t); 
+								}
+							}
+							if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j, k - 1) > 0)
+							{
+								T theta = abs(boundary_phi_z(i, j, k))/(abs(boundary_phi_z(i, j, k - 1)) + abs(boundary_phi_z(i, j, k)));
+								velocity_field_mac_ghost_z_z(i, j, k - 1) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k);
+
+								for (int t = 2; t <= 4 ; t++)
+								{
+									velocity_field_mac_ghost_z_z(i, j, k - t) = pow(10*t,t); 
+								}
+							}
+						}
+						multithreading.Sync(thread_id);
+
+						GRID_ITERATION_3D(boundary_phi_y.partial_grids[thread_id])
+						{
+							if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j + 1, k) > 0)
+							{
+								T theta = abs(boundary_phi_y(i, j, k))/(abs(boundary_phi_y(i, j + 1, k)) + abs(boundary_phi_y(i, j, k)));
+								velocity_field_mac_ghost_y_y(i, j + 1, k) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j, k);
+
+								for (int t = 2; t <= 4 ; t++)
+								{
+									velocity_field_mac_ghost_y_y(i, j + t, k) = pow(10*t,t); 
+								}
+							}
+							if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j - 1, k) > 0)
+							{
+								T theta = abs(boundary_phi_y(i, j, k))/(abs(boundary_phi_y(i, j - 1, k)) + abs(boundary_phi_y(i, j, k)));
+								velocity_field_mac_ghost_y_y(i, j - 1, k) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j, k);
+
+								for (int t = 2; t <= 4 ; t++)
+								{
+									velocity_field_mac_ghost_y_y(i, j - t, k) = pow(10*t,t);
+								}
+							}
+							if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j, k + 1) > 0)
+							{
+								T theta = abs(boundary_phi_y(i, j, k))/(abs(boundary_phi_y(i, j, k + 1)) + abs(boundary_phi_y(i, j, k)));
+								velocity_field_mac_ghost_y_z(i, j, k + 1) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j, k);
+
+								for (int t = 2; t <= 4 ; t++)
+								{
+									velocity_field_mac_ghost_y_z(i, j, k + t) = pow(10*t,t); 
+								}
+							}
+							if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j, k - 1) > 0)
+							{
+								T theta = abs(boundary_phi_y(i, j, k))/(abs(boundary_phi_y(i, j, k - 1)) + abs(boundary_phi_y(i, j, k)));
+								velocity_field_mac_ghost_y_z(i, j, k - 1) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j, k);
+
+								for (int t = 2; t <= 4 ; t++)
+								{
+									velocity_field_mac_ghost_y_z(i, j, k - t) = pow(10*t,t); 
+								}
+							}
+						}
+						multithreading.Sync(thread_id);
+					} 
+				}
+				if (boundary_order_velocity == 2)
+				{
 					GRID_ITERATION_3D(boundary_phi_x.partial_grids[thread_id])
 					{
 						if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j + 1, k) > 0)
 						{
 							T theta = abs(boundary_phi_x(i, j, k))/(abs(boundary_phi_x(i, j + 1, k)) + abs(boundary_phi_x(i, j, k)));
-							velocity_field_mac_ghost_x_y(i, j + 1, k) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j, k);
+							velocity_field_mac_ghost_x_y(i, j + 1, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_x(i, j, k) - velocity_field_mac_ghost_x(i, j - 1, k));
 
 							for (int t = 2; t <= 4 ; t++)
 							{
@@ -714,7 +866,7 @@ public: // Member Functions
 						if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j - 1, k) > 0)
 						{
 							T theta = abs(boundary_phi_x(i, j, k))/(abs(boundary_phi_x(i, j - 1, k)) + abs(boundary_phi_x(i, j, k)));
-							velocity_field_mac_ghost_x_y(i, j - 1, k) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j, k);
+							velocity_field_mac_ghost_x_y(i, j - 1, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_x(i, j, k) - velocity_field_mac_ghost_x(i, j + 1, k));
 
 							for (int t = 2; t <= 4 ; t++)
 							{
@@ -724,7 +876,7 @@ public: // Member Functions
 						if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j, k + 1) > 0)
 						{
 							T theta = abs(boundary_phi_x(i, j, k))/(abs(boundary_phi_x(i, j, k + 1)) + abs(boundary_phi_x(i, j, k)));
-							velocity_field_mac_ghost_x_z(i, j, k + 1) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j, k);
+							velocity_field_mac_ghost_x_z(i, j, k + 1) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_x(i, j, k) - velocity_field_mac_ghost_x(i, j, k - 1));
 
 							for (int t = 2; t <= 4 ; t++)
 							{
@@ -734,8 +886,8 @@ public: // Member Functions
 						if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j, k - 1) > 0)
 						{
 							T theta = abs(boundary_phi_x(i, j, k))/(abs(boundary_phi_x(i, j, k - 1)) + abs(boundary_phi_x(i, j, k)));
-							velocity_field_mac_ghost_x_z(i, j, k - 1) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j, k);
-
+							velocity_field_mac_ghost_x_z(i, j, k - 1) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_x(i, j, k) - velocity_field_mac_ghost_x(i, j, k + 1));
+							
 							for (int t = 2; t <= 4 ; t++)
 							{
 								velocity_field_mac_ghost_x_z(i, j, k - t) = pow(10*t,t); 
@@ -749,8 +901,8 @@ public: // Member Functions
 						if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j + 1, k) > 0)
 						{
 							T theta = abs(boundary_phi_z(i, j, k))/(abs(boundary_phi_z(i, j + 1, k)) + abs(boundary_phi_z(i, j, k)));
-							velocity_field_mac_ghost_z_y(i, j + 1, k) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k);
-
+							velocity_field_mac_ghost_z_y(i, j + 1, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_z(i, j, k) - velocity_field_mac_ghost_z(i, j - 1, k));
+							
 							for (int t = 2; t <= 4 ; t++)
 							{
 								velocity_field_mac_ghost_z_y(i, j + t, k) = pow(10*t,t); 
@@ -759,7 +911,7 @@ public: // Member Functions
 						if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j - 1, k) > 0)
 						{
 							T theta = abs(boundary_phi_z(i, j, k))/(abs(boundary_phi_z(i, j - 1, k)) + abs(boundary_phi_z(i, j, k)));
-							velocity_field_mac_ghost_z_y(i, j - 1, k) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k);
+							velocity_field_mac_ghost_z_y(i, j - 1, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_z(i, j, k) - velocity_field_mac_ghost_z(i, j + 1, k));
 
 							for (int t = 2; t <= 4 ; t++)
 							{
@@ -769,7 +921,7 @@ public: // Member Functions
 						if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j, k + 1) > 0)
 						{
 							T theta = abs(boundary_phi_z(i, j, k))/(abs(boundary_phi_z(i, j, k + 1)) + abs(boundary_phi_z(i, j, k)));
-							velocity_field_mac_ghost_z_z(i, j, k + 1) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k);
+							velocity_field_mac_ghost_z_z(i, j, k + 1) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_z(i, j, k) - velocity_field_mac_ghost_z(i, j, k - 1));
 
 							for (int t = 2; t <= 4 ; t++)
 							{
@@ -779,7 +931,7 @@ public: // Member Functions
 						if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j, k - 1) > 0)
 						{
 							T theta = abs(boundary_phi_z(i, j, k))/(abs(boundary_phi_z(i, j, k - 1)) + abs(boundary_phi_z(i, j, k)));
-							velocity_field_mac_ghost_z_z(i, j, k - 1) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k);
+							velocity_field_mac_ghost_z_z(i, j, k - 1) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_z(i, j, k) - velocity_field_mac_ghost_z(i, j, k + 1));
 
 							for (int t = 2; t <= 4 ; t++)
 							{
@@ -794,7 +946,7 @@ public: // Member Functions
 						if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j + 1, k) > 0)
 						{
 							T theta = abs(boundary_phi_y(i, j, k))/(abs(boundary_phi_y(i, j + 1, k)) + abs(boundary_phi_y(i, j, k)));
-							velocity_field_mac_ghost_y_y(i, j + 1, k) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j, k);
+							velocity_field_mac_ghost_y_y(i, j + 1, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_y(i, j, k) - velocity_field_mac_ghost_y(i, j - 1, k));
 
 							for (int t = 2; t <= 4 ; t++)
 							{
@@ -804,7 +956,7 @@ public: // Member Functions
 						if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j - 1, k) > 0)
 						{
 							T theta = abs(boundary_phi_y(i, j, k))/(abs(boundary_phi_y(i, j - 1, k)) + abs(boundary_phi_y(i, j, k)));
-							velocity_field_mac_ghost_y_y(i, j - 1, k) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j, k);
+							velocity_field_mac_ghost_y_y(i, j - 1, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_y(i, j, k) - velocity_field_mac_ghost_y(i, j + 1, k));
 
 							for (int t = 2; t <= 4 ; t++)
 							{
@@ -814,7 +966,7 @@ public: // Member Functions
 						if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j, k + 1) > 0)
 						{
 							T theta = abs(boundary_phi_y(i, j, k))/(abs(boundary_phi_y(i, j, k + 1)) + abs(boundary_phi_y(i, j, k)));
-							velocity_field_mac_ghost_y_z(i, j, k + 1) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j, k);
+							velocity_field_mac_ghost_y_z(i, j, k + 1) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_y(i, j, k) - velocity_field_mac_ghost_y(i, j, k - 1));
 
 							for (int t = 2; t <= 4 ; t++)
 							{
@@ -824,7 +976,7 @@ public: // Member Functions
 						if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j, k - 1) > 0)
 						{
 							T theta = abs(boundary_phi_y(i, j, k))/(abs(boundary_phi_y(i, j, k - 1)) + abs(boundary_phi_y(i, j, k)));
-							velocity_field_mac_ghost_y_z(i, j, k - 1) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j, k);
+							velocity_field_mac_ghost_y_z(i, j, k - 1) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_y(i, j, k) - velocity_field_mac_ghost_y(i, j, k + 1));
 
 							for (int t = 2; t <= 4 ; t++)
 							{
@@ -833,7 +985,7 @@ public: // Member Functions
 						}
 					}
 					multithreading.Sync(thread_id);
-				}
+				} 
 			}
 		}
 	}

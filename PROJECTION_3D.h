@@ -994,15 +994,30 @@ public: // Member Functions
 						{
 							if (boundary_levelset(i, j, k) > 0)
 							{
-								bc_array(i, j, k) = BC_NEUM;
+								if (boundary_levelset(i, j - 1, k) < 0 || boundary_levelset(i, j + 1, k) < 0 || boundary_levelset(i, j, k - 1) < 0 || boundary_levelset(i, j, k + 1) < 0)
+								{
+									bc_array(i, j, k) = BC_NEUM;
+								}
+								else
+								{
+									bc_array(i, j, k) = BC_OTHER;
+								}
 							}
-							else if (i < grid.i_start)
+							else if (i == grid.i_start - 1)
 							{
 								bc_array(i, j, k) = BC_NEUM;
 							}
-							else if (i > grid.i_end)
+							else if (i == grid.i_end + 1)
 							{
 								bc_array(i, j, k) = BC_NEUM;
+							}
+							else if (i < grid.i_start - 1)
+							{
+								bc_array(i, j, k) = BC_OTHER;
+							}
+							else if (i > grid.i_end + 1)
+							{
+								bc_array(i, j, k) = BC_OTHER;
 							}
 							else
 							{

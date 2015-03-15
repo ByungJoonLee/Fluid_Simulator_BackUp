@@ -164,6 +164,9 @@ public: // Dimensionless Variable
 public: // Pipe Radius
 	T							a;
 
+public: // Boundary Order for Velocity
+	int							boundary_order_velocity;
+
 public: // Constructor and Destructor
 	VISCOSITY_3D(MULTITHREADING& multithreading_input, LEVELSET_3D& water_levelset_input, LEVELSET_3D& boundary_levelset_input, FIELD_STRUCTURE_3D<T>& water_velocity_field_mac_x_input, FIELD_STRUCTURE_3D<T>& water_velocity_field_mac_y_input, FIELD_STRUCTURE_3D<T>& water_velocity_field_mac_z_input,
 				 FIELD_STRUCTURE_3D<T>& scalar_field_ghost_input, FIELD_STRUCTURE_3D<T>& velocity_field_mac_ghost_x_input, FIELD_STRUCTURE_3D<T>& velocity_field_mac_ghost_y_input, FIELD_STRUCTURE_3D<T>& velocity_field_mac_ghost_z_input)
@@ -171,7 +174,7 @@ public: // Constructor and Destructor
 				 water_velocity_field_mac_x(water_velocity_field_mac_x_input), water_velocity_field_mac_y(water_velocity_field_mac_y_input), water_velocity_field_mac_z(water_velocity_field_mac_z_input), 
 				 scalar_field_ghost(scalar_field_ghost_input), velocity_field_mac_ghost_x(velocity_field_mac_ghost_x_input), velocity_field_mac_ghost_y(velocity_field_mac_ghost_y_input), velocity_field_mac_ghost_z(velocity_field_mac_ghost_z_input),
                  air_density((T)0), water_density((T)0), oil_density((T)0), air_viscosity((T)0), water_viscosity((T)0), oil_viscosity((T)0), air_bubble_rising(false), water_drop(false), air_water_simulation(false), oil_water_simulation(false), semi_implicit_approach(false), dimensionless_form(false),
-				 regular_boundary(false), cylindrical_boundary(false), is_vertical(false), is_parallel(false)
+				 regular_boundary(false), cylindrical_boundary(false), is_vertical(false), is_parallel(false), boundary_order_velocity((int)1)
 	{}
 
 	~VISCOSITY_3D(void)
@@ -223,6 +226,18 @@ public: // Initialization Function
 		
 		// Semi-Implicit Approach
 		semi_implicit_approach = script_block.GetBoolean("semi_implicit_approach", (bool)false);
+
+		// Boundary Order for Velocity
+		boundary_order_velocity = script_block.FindBlock("VELOCITY_ADVECTION").GetInteger("boundary_order_velocity", (int)1);
+		
+		if (boundary_order_velocity == 1)
+		{
+			cout << "Order of velocity boundary: " << "1" << endl;
+		}
+		if (boundary_order_velocity == 2)
+		{
+			cout << "Order of velocity boundary: " << "2" << endl;
+		}
 
 		// x-component 
 		// Density
@@ -1530,6 +1545,506 @@ public: // Member Functions
 		multithreading.Sync(thread_id);
 	}
 
+	//void SetupBoundaryConditionsForVelocity(const int& thread_id)
+	//{
+	//	if (oil_water_simulation)
+	//	{
+	//		if (is_vertical)
+	//		{
+	//			GRID_ITERATION_3D(boundary_phi_x.partial_grids[thread_id])
+	//			{
+	//				T x_coor = boundary_phi_x.x_min + i*boundary_phi_x.dx, z_coor = boundary_phi_x.z_min + k*boundary_phi_x.dz;
+	//				boundary_phi_x(i, j, k) = sqrt(POW2(x_coor) + POW2(z_coor)) - a;
+	//				//boundary_phi_x(i, j, k) = (T)0.5*(boundary_levelset(i, j, k) + boundary_levelset(i - 1, j, k));	
+	//			}
+	//			multithreading.Sync(thread_id);
+
+	//			GRID_ITERATION_3D(boundary_phi_y.partial_grids[thread_id])
+	//			{
+	//				T x_coor = boundary_phi_y.x_min + i*boundary_phi_y.dx, z_coor = boundary_phi_y.z_min + k*boundary_phi_y.dz;
+	//				boundary_phi_y(i, j, k) = sqrt(POW2(x_coor) + POW2(z_coor)) - a;
+	//				//boundary_phi_y(i, j, k) = (T)0.5*(boundary_levelset(i, j, k) + boundary_levelset(i, j - 1, k));	
+	//			}
+	//			multithreading.Sync(thread_id);
+
+	//			GRID_ITERATION_3D(boundary_phi_z.partial_grids[thread_id])
+	//			{
+	//				T x_coor = boundary_phi_z.x_min + i*boundary_phi_z.dx, z_coor = boundary_phi_z.z_min + k*boundary_phi_z.dz;
+	//				boundary_phi_z(i, j, k) = sqrt(POW2(x_coor) + POW2(z_coor)) - a;
+	//				//boundary_phi_z(i, j, k) = (T)0.5*(boundary_levelset(i, j, k) + boundary_levelset(i, j, k - 1));	
+	//			}
+	//			multithreading.Sync(thread_id); 
+	//		}
+	//		if (is_parallel)
+	//		{
+	//			GRID_ITERATION_3D(boundary_phi_x.partial_grids[thread_id])
+	//			{
+	//				T y_coor = boundary_phi_x.y_min + j*boundary_phi_x.dy, z_coor = boundary_phi_x.z_min + k*boundary_phi_x.dz;
+	//				boundary_phi_x(i, j, k) = sqrt(POW2(y_coor) + POW2(z_coor)) - a;
+	//				//boundary_phi_x(i, j, k) = (T)0.5*(boundary_levelset(i, j, k) + boundary_levelset(i - 1, j, k));	
+	//			}
+	//			multithreading.Sync(thread_id);
+
+	//			GRID_ITERATION_3D(boundary_phi_y.partial_grids[thread_id])
+	//			{
+	//				T y_coor = boundary_phi_y.y_min + j*boundary_phi_y.dy, z_coor = boundary_phi_y.z_min + k*boundary_phi_y.dz;
+	//				boundary_phi_y(i, j, k) = sqrt(POW2(y_coor) + POW2(z_coor)) - a;
+	//				//boundary_phi_y(i, j, k) = (T)0.5*(boundary_levelset(i, j, k) + boundary_levelset(i, j - 1, k));	
+	//			}
+	//			multithreading.Sync(thread_id);
+
+	//			GRID_ITERATION_3D(boundary_phi_z.partial_grids[thread_id])
+	//			{
+	//				T y_coor = boundary_phi_z.y_min + j*boundary_phi_z.dy, z_coor = boundary_phi_z.z_min + k*boundary_phi_z.dz;
+	//				boundary_phi_z(i, j, k) = sqrt(POW2(y_coor) + POW2(z_coor)) - a;
+	//				//boundary_phi_z(i, j, k) = (T)0.5*(boundary_levelset(i, j, k) + boundary_levelset(i, j, k - 1));	
+	//			}
+	//			multithreading.Sync(thread_id); 
+	//		}
+
+	//			
+	//		
+	//			if (is_vertical)
+	//			{
+	//				// Periodic Boundary Condition
+	//				velocity_field_mac_ghost_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+	//				velocity_field_mac_ghost_y.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+	//				velocity_field_mac_ghost_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+
+	//				velocity_field_mac_ghost_x_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+	//				velocity_field_mac_ghost_x_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+	//				velocity_field_mac_ghost_y_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+	//				velocity_field_mac_ghost_y_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+	//				velocity_field_mac_ghost_z_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+	//				velocity_field_mac_ghost_z_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+
+	//				GRID_ITERATION_3D(boundary_phi_x.partial_grids[thread_id])
+	//				{
+	//					if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i + 1, j, k) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_x(i, j, k))/(abs(boundary_phi_x(i + 1, j, k)) + abs(boundary_phi_x(i, j, k)));
+	//						velocity_field_mac_ghost_x_x(i + 1, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j, k);
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_x_x(i + t, j, k) = pow(10*t,t); 
+	//						}
+	//					}
+	//					if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i - 1, j, k) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_x(i, j, k))/(abs(boundary_phi_x(i - 1, j, k)) + abs(boundary_phi_x(i, j, k)));
+	//						velocity_field_mac_ghost_x_x(i - 1, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j, k);
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_x_x(i - t, j, k) = pow(10*t,t);
+	//						}
+	//					}
+	//					if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j, k + 1) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_x(i, j, k))/(abs(boundary_phi_x(i, j, k + 1)) + abs(boundary_phi_x(i, j, k)));
+	//						velocity_field_mac_ghost_x_z(i, j, k + 1) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j, k);
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_x_z(i, j, k + t) = pow(10*t,t); 
+	//						}
+	//					}
+	//					if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j, k - 1) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_x(i, j, k))/(abs(boundary_phi_x(i, j, k - 1)) + abs(boundary_phi_x(i, j, k)));
+	//						velocity_field_mac_ghost_x_z(i, j, k - 1) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j, k);
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_x_z(i, j, k - t) = pow(10*t,t); 
+	//						}
+	//					}
+	//				}
+	//				multithreading.Sync(thread_id);
+
+	//				GRID_ITERATION_3D(boundary_phi_z.partial_grids[thread_id])
+	//				{
+	//					if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i + 1, j, k) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_z(i, j, k))/(abs(boundary_phi_z(i + 1, j, k)) + abs(boundary_phi_z(i, j, k)));
+	//						velocity_field_mac_ghost_z_x(i + 1, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k);
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_z_x(i + t, j, k) = pow(10*t,t); 
+	//						}
+	//					}
+	//					if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i - 1, j, k) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_z(i, j, k))/(abs(boundary_phi_z(i - 1, j, k)) + abs(boundary_phi_z(i, j, k)));
+	//						velocity_field_mac_ghost_z_x(i - 1, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k);
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_z_x(i - t, j, k) = pow(10*t,t);
+	//						}
+	//					}
+	//					if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j, k + 1) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_z(i, j, k))/(abs(boundary_phi_z(i, j, k + 1)) + abs(boundary_phi_z(i, j, k)));
+	//						velocity_field_mac_ghost_z_z(i, j, k + 1) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k);
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_z_z(i, j, k + t) = pow(10*t,t); 
+	//						}
+	//					}
+	//					if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j, k - 1) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_z(i, j, k))/(abs(boundary_phi_z(i, j, k - 1)) + abs(boundary_phi_z(i, j, k)));
+	//						velocity_field_mac_ghost_z_z(i, j, k - 1) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k);
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_z_z(i, j, k - t) = pow(10*t,t); 
+	//						}
+	//					}
+	//				}
+	//				multithreading.Sync(thread_id);
+
+	//				GRID_ITERATION_3D(boundary_phi_y.partial_grids[thread_id])
+	//				{
+	//					if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i + 1, j, k) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_y(i, j, k))/(abs(boundary_phi_y(i + 1, j, k)) + abs(boundary_phi_y(i, j, k)));
+	//						velocity_field_mac_ghost_y_x(i + 1, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j, k);
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_y_x(i + t, j, k) = pow(10*t,t); 
+	//						}
+	//					}
+	//					if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i - 1, j, k) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_y(i, j, k))/(abs(boundary_phi_y(i - 1, j, k)) + abs(boundary_phi_y(i, j, k)));
+	//						velocity_field_mac_ghost_y_x(i - 1, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j, k);
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_y_x(i - t, j, k) = pow(10*t,t);
+	//						}
+	//					}
+	//					if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j, k + 1) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_y(i, j, k))/(abs(boundary_phi_y(i, j, k + 1)) + abs(boundary_phi_y(i, j, k)));
+	//						velocity_field_mac_ghost_y_z(i, j, k + 1) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j, k);
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_y_z(i, j, k + t) = pow(10*t,t); 
+	//						}
+	//					}
+	//					if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j, k - 1) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_y(i, j, k))/(abs(boundary_phi_y(i, j, k - 1)) + abs(boundary_phi_y(i, j, k)));
+	//						velocity_field_mac_ghost_y_z(i, j, k - 1) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j, k);
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_y_z(i, j, k - t) = pow(10*t,t); 
+	//						}
+	//					}
+	//				}
+	//				multithreading.Sync(thread_id);
+	//			}
+	//			if (is_parallel)
+	//			{
+	//				// Periodic Boundary Condition
+	//				velocity_field_mac_ghost_x.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+	//				velocity_field_mac_ghost_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+	//				velocity_field_mac_ghost_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+
+	//				velocity_field_mac_ghost_x_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+	//				velocity_field_mac_ghost_x_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+	//				velocity_field_mac_ghost_y_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+	//				velocity_field_mac_ghost_y_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+	//				velocity_field_mac_ghost_z_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+	//				velocity_field_mac_ghost_z_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+
+	//				if (boundary_order_velocity == 1)
+	//				{
+	//					GRID_ITERATION_3D(boundary_phi_x.partial_grids[thread_id])
+	//					{
+	//						if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j + 1, k) > 0)
+	//						{
+	//							T theta = abs(boundary_phi_x(i, j, k))/(abs(boundary_phi_x(i, j + 1, k)) + abs(boundary_phi_x(i, j, k)));
+	//							velocity_field_mac_ghost_x_y(i, j + 1, k) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j, k);
+
+	//							for (int t = 2; t <= 4 ; t++)
+	//							{
+	//								velocity_field_mac_ghost_x_y(i, j + t, k) = pow(10*t,t); 
+	//							}
+	//						}
+	//						if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j - 1, k) > 0)
+	//						{
+	//							T theta = abs(boundary_phi_x(i, j, k))/(abs(boundary_phi_x(i, j - 1, k)) + abs(boundary_phi_x(i, j, k)));
+	//							velocity_field_mac_ghost_x_y(i, j - 1, k) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j, k);
+
+	//							for (int t = 2; t <= 4 ; t++)
+	//							{
+	//								velocity_field_mac_ghost_x_y(i, j - t, k) = pow(10*t,t);
+	//							}
+	//						}
+	//						if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j, k + 1) > 0)
+	//						{
+	//							T theta = abs(boundary_phi_x(i, j, k))/(abs(boundary_phi_x(i, j, k + 1)) + abs(boundary_phi_x(i, j, k)));
+	//							velocity_field_mac_ghost_x_z(i, j, k + 1) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j, k);
+
+	//							for (int t = 2; t <= 4 ; t++)
+	//							{
+	//								velocity_field_mac_ghost_x_z(i, j, k + t) = pow(10*t,t); 
+	//							}
+	//						}
+	//						if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j, k - 1) > 0)
+	//						{
+	//							T theta = abs(boundary_phi_x(i, j, k))/(abs(boundary_phi_x(i, j, k - 1)) + abs(boundary_phi_x(i, j, k)));
+	//							velocity_field_mac_ghost_x_z(i, j, k - 1) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j, k);
+
+	//							for (int t = 2; t <= 4 ; t++)
+	//							{
+	//								velocity_field_mac_ghost_x_z(i, j, k - t) = pow(10*t,t); 
+	//							}
+	//						}
+	//					}
+	//					multithreading.Sync(thread_id);
+
+	//					GRID_ITERATION_3D(boundary_phi_z.partial_grids[thread_id])
+	//					{
+	//						if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j + 1, k) > 0)
+	//						{
+	//							T theta = abs(boundary_phi_z(i, j, k))/(abs(boundary_phi_z(i, j + 1, k)) + abs(boundary_phi_z(i, j, k)));
+	//							velocity_field_mac_ghost_z_y(i, j + 1, k) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k);
+
+	//							for (int t = 2; t <= 4 ; t++)
+	//							{
+	//								velocity_field_mac_ghost_z_y(i, j + t, k) = pow(10*t,t); 
+	//							}
+	//						}
+	//						if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j - 1, k) > 0)
+	//						{
+	//							T theta = abs(boundary_phi_z(i, j, k))/(abs(boundary_phi_z(i, j - 1, k)) + abs(boundary_phi_z(i, j, k)));
+	//							velocity_field_mac_ghost_z_y(i, j - 1, k) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k);
+
+	//							for (int t = 2; t <= 4 ; t++)
+	//							{
+	//								velocity_field_mac_ghost_z_y(i, j - t, k) = pow(10*t,t);
+	//							}
+	//						}
+	//						if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j, k + 1) > 0)
+	//						{
+	//							T theta = abs(boundary_phi_z(i, j, k))/(abs(boundary_phi_z(i, j, k + 1)) + abs(boundary_phi_z(i, j, k)));
+	//							velocity_field_mac_ghost_z_z(i, j, k + 1) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k);
+
+	//							for (int t = 2; t <= 4 ; t++)
+	//							{
+	//								velocity_field_mac_ghost_z_z(i, j, k + t) = pow(10*t,t); 
+	//							}
+	//						}
+	//						if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j, k - 1) > 0)
+	//						{
+	//							T theta = abs(boundary_phi_z(i, j, k))/(abs(boundary_phi_z(i, j, k - 1)) + abs(boundary_phi_z(i, j, k)));
+	//							velocity_field_mac_ghost_z_z(i, j, k - 1) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k);
+
+	//							for (int t = 2; t <= 4 ; t++)
+	//							{
+	//								velocity_field_mac_ghost_z_z(i, j, k - t) = pow(10*t,t); 
+	//							}
+	//						}
+	//					}
+	//					multithreading.Sync(thread_id);
+
+	//					GRID_ITERATION_3D(boundary_phi_y.partial_grids[thread_id])
+	//					{
+	//						if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j + 1, k) > 0)
+	//						{
+	//							T theta = abs(boundary_phi_y(i, j, k))/(abs(boundary_phi_y(i, j + 1, k)) + abs(boundary_phi_y(i, j, k)));
+	//							velocity_field_mac_ghost_y_y(i, j + 1, k) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j, k);
+
+	//							for (int t = 2; t <= 4 ; t++)
+	//							{
+	//								velocity_field_mac_ghost_y_y(i, j + t, k) = pow(10*t,t); 
+	//							}
+	//						}
+	//						if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j - 1, k) > 0)
+	//						{
+	//							T theta = abs(boundary_phi_y(i, j, k))/(abs(boundary_phi_y(i, j - 1, k)) + abs(boundary_phi_y(i, j, k)));
+	//							velocity_field_mac_ghost_y_y(i, j - 1, k) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j, k);
+
+	//							for (int t = 2; t <= 4 ; t++)
+	//							{
+	//								velocity_field_mac_ghost_y_y(i, j - t, k) = pow(10*t,t);
+	//							}
+	//						}
+	//						if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j, k + 1) > 0)
+	//						{
+	//							T theta = abs(boundary_phi_y(i, j, k))/(abs(boundary_phi_y(i, j, k + 1)) + abs(boundary_phi_y(i, j, k)));
+	//							velocity_field_mac_ghost_y_z(i, j, k + 1) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j, k);
+
+	//							for (int t = 2; t <= 4 ; t++)
+	//							{
+	//								velocity_field_mac_ghost_y_z(i, j, k + t) = pow(10*t,t); 
+	//							}
+	//						}
+	//						if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j, k - 1) > 0)
+	//						{
+	//							T theta = abs(boundary_phi_y(i, j, k))/(abs(boundary_phi_y(i, j, k - 1)) + abs(boundary_phi_y(i, j, k)));
+	//							velocity_field_mac_ghost_y_z(i, j, k - 1) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j, k);
+
+	//							for (int t = 2; t <= 4 ; t++)
+	//							{
+	//								velocity_field_mac_ghost_y_z(i, j, k - t) = pow(10*t,t); 
+	//							}
+	//						}
+	//					}
+	//					multithreading.Sync(thread_id);
+	//				} 
+	//			}
+	//			if (boundary_order_velocity == 2)
+	//			{
+	//				GRID_ITERATION_3D(boundary_phi_x.partial_grids[thread_id])
+	//				{
+	//					if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j + 1, k) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_x(i, j, k))/(abs(boundary_phi_x(i, j + 1, k)) + abs(boundary_phi_x(i, j, k)));
+	//						velocity_field_mac_ghost_x_y(i, j + 1, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_x(i, j, k) - velocity_field_mac_ghost_x(i, j - 1, k));
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_x_y(i, j + t, k) = pow(10*t,t); 
+	//						}
+	//					}
+	//					if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j - 1, k) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_x(i, j, k))/(abs(boundary_phi_x(i, j - 1, k)) + abs(boundary_phi_x(i, j, k)));
+	//						velocity_field_mac_ghost_x_y(i, j - 1, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_x(i, j, k) - velocity_field_mac_ghost_x(i, j + 1, k));
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_x_y(i, j - t, k) = pow(10*t,t);
+	//						}
+	//					}
+	//					if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j, k + 1) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_x(i, j, k))/(abs(boundary_phi_x(i, j, k + 1)) + abs(boundary_phi_x(i, j, k)));
+	//						velocity_field_mac_ghost_x_z(i, j, k + 1) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_x(i, j, k) - velocity_field_mac_ghost_x(i, j, k - 1));
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_x_z(i, j, k + t) = pow(10*t,t); 
+	//						}
+	//					}
+	//					if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j, k - 1) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_x(i, j, k))/(abs(boundary_phi_x(i, j, k - 1)) + abs(boundary_phi_x(i, j, k)));
+	//						velocity_field_mac_ghost_x_z(i, j, k - 1) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_x(i, j, k) - velocity_field_mac_ghost_x(i, j, k + 1));
+	//						
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_x_z(i, j, k - t) = pow(10*t,t); 
+	//						}
+	//					}
+	//				}
+	//				multithreading.Sync(thread_id);
+
+	//				GRID_ITERATION_3D(boundary_phi_z.partial_grids[thread_id])
+	//				{
+	//					if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j + 1, k) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_z(i, j, k))/(abs(boundary_phi_z(i, j + 1, k)) + abs(boundary_phi_z(i, j, k)));
+	//						velocity_field_mac_ghost_z_y(i, j + 1, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_z(i, j, k) - velocity_field_mac_ghost_z(i, j - 1, k));
+	//						
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_z_y(i, j + t, k) = pow(10*t,t); 
+	//						}
+	//					}
+	//					if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j - 1, k) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_z(i, j, k))/(abs(boundary_phi_z(i, j - 1, k)) + abs(boundary_phi_z(i, j, k)));
+	//						velocity_field_mac_ghost_z_y(i, j - 1, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_z(i, j, k) - velocity_field_mac_ghost_z(i, j + 1, k));
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_z_y(i, j - t, k) = pow(10*t,t);
+	//						}
+	//					}
+	//					if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j, k + 1) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_z(i, j, k))/(abs(boundary_phi_z(i, j, k + 1)) + abs(boundary_phi_z(i, j, k)));
+	//						velocity_field_mac_ghost_z_z(i, j, k + 1) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_z(i, j, k) - velocity_field_mac_ghost_z(i, j, k - 1));
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_z_z(i, j, k + t) = pow(10*t,t); 
+	//						}
+	//					}
+	//					if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j, k - 1) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_z(i, j, k))/(abs(boundary_phi_z(i, j, k - 1)) + abs(boundary_phi_z(i, j, k)));
+	//						velocity_field_mac_ghost_z_z(i, j, k - 1) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_z(i, j, k) - velocity_field_mac_ghost_z(i, j, k + 1));
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_z_z(i, j, k - t) = pow(10*t,t); 
+	//						}
+	//					}
+	//				}
+	//				multithreading.Sync(thread_id);
+
+	//				GRID_ITERATION_3D(boundary_phi_y.partial_grids[thread_id])
+	//				{
+	//					if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j + 1, k) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_y(i, j, k))/(abs(boundary_phi_y(i, j + 1, k)) + abs(boundary_phi_y(i, j, k)));
+	//						velocity_field_mac_ghost_y_y(i, j + 1, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_y(i, j, k) - velocity_field_mac_ghost_y(i, j - 1, k));
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_y_y(i, j + t, k) = pow(10*t,t); 
+	//						}
+	//					}
+	//					if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j - 1, k) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_y(i, j, k))/(abs(boundary_phi_y(i, j - 1, k)) + abs(boundary_phi_y(i, j, k)));
+	//						velocity_field_mac_ghost_y_y(i, j - 1, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_y(i, j, k) - velocity_field_mac_ghost_y(i, j + 1, k));
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_y_y(i, j - t, k) = pow(10*t,t);
+	//						}
+	//					}
+	//					if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j, k + 1) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_y(i, j, k))/(abs(boundary_phi_y(i, j, k + 1)) + abs(boundary_phi_y(i, j, k)));
+	//						velocity_field_mac_ghost_y_z(i, j, k + 1) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_y(i, j, k) - velocity_field_mac_ghost_y(i, j, k - 1));
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_y_z(i, j, k + t) = pow(10*t,t); 
+	//						}
+	//					}
+	//					if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j, k - 1) > 0)
+	//					{
+	//						T theta = abs(boundary_phi_y(i, j, k))/(abs(boundary_phi_y(i, j, k - 1)) + abs(boundary_phi_y(i, j, k)));
+	//						velocity_field_mac_ghost_y_z(i, j, k - 1) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_y(i, j, k) - velocity_field_mac_ghost_y(i, j, k + 1));
+
+	//						for (int t = 2; t <= 4 ; t++)
+	//						{
+	//							velocity_field_mac_ghost_y_z(i, j, k - t) = pow(10*t,t); 
+	//						}
+	//					}
+	//				}
+	//				multithreading.Sync(thread_id);
+	//			} 
+	//		}
+	//}
+
 	void SetupBoundaryConditionsForVelocity(const int& thread_id)
 	{
 		if (oil_water_simulation)
@@ -1586,13 +2101,276 @@ public: // Member Functions
 				multithreading.Sync(thread_id); 
 			}
 
+			if (boundary_order_velocity == 1)
+			{
+				if (is_vertical)
+				{
+					// Periodic Boundary Condition
+					velocity_field_mac_ghost_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+					velocity_field_mac_ghost_y.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+					velocity_field_mac_ghost_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+
+					velocity_field_mac_ghost_x_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+					velocity_field_mac_ghost_x_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+					velocity_field_mac_ghost_y_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+					velocity_field_mac_ghost_y_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+					velocity_field_mac_ghost_z_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+					velocity_field_mac_ghost_z_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+
+					GRID_ITERATION_3D(boundary_phi_x.partial_grids[thread_id])
+					{
+						if (boundary_phi_x(i, j, k) > 0)
+						{	
+							if ((boundary_phi_x(i - 1, j, k) > 0) && (boundary_phi_x(i + 1, j, k) > 0) && (boundary_phi_x(i, j, k - 1) > 0) && (boundary_phi_x(i, j, k + 1) > 0))
+							{
+
+								velocity_field_mac_ghost_x_x(i, j, k) = (T)0;
+								velocity_field_mac_ghost_x_z(i, j, k) = (T)0;
+							}
+							else if (boundary_phi_x(i - 1, j, k) < 0)
+							{
+								T theta = abs(boundary_phi_x(i - 1, j, k))/(abs(boundary_phi_x(i - 1, j, k)) + abs(boundary_phi_x(i, j, k)));
+								velocity_field_mac_ghost_x_x(i, j, k) = (theta - (T)1)/theta*velocity_field_mac_ghost_x(i - 1, j, k);
+							}
+							else if (boundary_phi_x(i + 1, j, k) < 0)
+							{
+								T theta = abs(boundary_phi_x(i + 1, j, k))/(abs(boundary_phi_x(i + 1, j, k)) + abs(boundary_phi_x(i, j, k)));
+								velocity_field_mac_ghost_x_x(i, j, k) = (theta - (T)1)/theta*velocity_field_mac_ghost_x(i + 1, j, k);								
+							}
+							else if (boundary_phi_x(i, j, k - 1) < 0)
+							{
+								T theta = abs(boundary_phi_x(i, j, k - 1))/(abs(boundary_phi_x(i, j, k - 1)) + abs(boundary_phi_x(i, j, k)));
+								velocity_field_mac_ghost_x_z(i, j, k) = (theta - (T)1)/theta*velocity_field_mac_ghost_x(i, j, k - 1);
+							}
+							else if (boundary_phi_x(i, j, k + 1) < 0)
+							{
+								T theta = abs(boundary_phi_x(i, j, k + 1))/(abs(boundary_phi_x(i, j, k + 1)) + abs(boundary_phi_x(i, j, k)));
+								velocity_field_mac_ghost_x_z(i, j, k) = (theta - (T)1)/theta*velocity_field_mac_ghost_x(i, j, k + 1);
+							}
+							else
+							{
+								velocity_field_mac_ghost_x_x(i, j, k) = (T)0;
+								velocity_field_mac_ghost_x_z(i, j, k) = (T)0;
+							}
+						}
+					}
+					multithreading.Sync(thread_id);
+
+					GRID_ITERATION_3D(boundary_phi_z.partial_grids[thread_id])
+					{
+						if (boundary_phi_z(i, j, k) > 0)
+						{
+							if ((boundary_phi_z(i - 1, j, k) > 0) && (boundary_phi_z(i + 1, j, k) > 0) && (boundary_phi_z(i, j, k - 1) > 0) && (boundary_phi_z(i, j, k + 1) > 0))
+							{
+								velocity_field_mac_ghost_z_x(i, j, k) = (T)0;
+								velocity_field_mac_ghost_z_z(i, j, k) = (T)0;
+							}
+							else if (boundary_phi_z(i - 1, j, k) < 0)
+							{
+								T theta = abs(boundary_phi_z(i - 1, j, k))/(abs(boundary_phi_z(i - 1, j, k)) + abs(boundary_phi_z(i, j, k)));
+								velocity_field_mac_ghost_z_x(i, j, k) = (theta - (T)1)/theta*velocity_field_mac_ghost_z(i - 1, j, k);
+							}
+							else if (boundary_phi_z(i + 1, j, k) < 0)
+							{
+								T theta = abs(boundary_phi_z(i + 1, j, k))/(abs(boundary_phi_z(i + 1, j, k)) + abs(boundary_phi_z(i, j, k)));
+								velocity_field_mac_ghost_z_x(i, j, k) = (theta - (T)1)/theta*velocity_field_mac_ghost_z(i + 1, j, k);
+							}
+							else if (boundary_phi_z(i, j, k - 1) < 0)
+							{
+								T theta = abs(boundary_phi_z(i, j, k - 1))/(abs(boundary_phi_z(i, j, k - 1)) + abs(boundary_phi_z(i, j, k)));
+								velocity_field_mac_ghost_z_z(i, j, k) = (theta - (T)1)/theta*velocity_field_mac_ghost_z(i, j, k - 1);
+							}
+							else if (boundary_phi_z(i, j, k + 1) < 0)
+							{
+								T theta = abs(boundary_phi_z(i, j, k + 1))/(abs(boundary_phi_z(i, j, k + 1)) + abs(boundary_phi_z(i, j, k)));
+								velocity_field_mac_ghost_z_z(i, j, k) = (theta - (T)1)/theta*velocity_field_mac_ghost_z(i, j, k + 1);
+							}
+							else
+							{
+								velocity_field_mac_ghost_z_x(i, j, k) = (T)0;
+								velocity_field_mac_ghost_z_z(i, j, k) = (T)0;
+							}
+						}	
+					}
+					multithreading.Sync(thread_id);
+
+					GRID_ITERATION_3D(boundary_phi_y.partial_grids[thread_id])
+					{
+						if (boundary_phi_y(i, j, k) > 0)
+						{
+							if ((boundary_phi_y(i - 1, j, k) > 0) && (boundary_phi_y(i + 1, j, k) > 0) && (boundary_phi_y(i, j, k - 1) > 0) && (boundary_phi_y(i, j, k + 1) > 0))
+							{
+								velocity_field_mac_ghost_y_x(i, j, k) = (T)0;
+								velocity_field_mac_ghost_y_z(i, j, k) = (T)0;
+							}
+							else if (boundary_phi_y(i - 1, j, k) < 0)
+							{
+								T theta = abs(boundary_phi_y(i - 1, j, k))/(abs(boundary_phi_y(i - 1, j, k)) + abs(boundary_phi_y(i, j, k)));
+								velocity_field_mac_ghost_y_x(i, j, k) = (theta - (T)1)/theta*water_velocity_field_mac_y(i - 1, j, k);
+							}
+							else if (boundary_phi_y(i + 1, j, k) < 0)
+							{
+								T theta = abs(boundary_phi_y(i + 1, j, k))/(abs(boundary_phi_y(i + 1, j, k)) + abs(boundary_phi_y(i, j, k)));
+								velocity_field_mac_ghost_y_x(i, j, k) = (theta - (T)1)/theta*water_velocity_field_mac_y(i + 1, j, k);
+							}
+							else if (boundary_phi_y(i, j, k - 1) < 0)
+							{
+								T theta = abs(boundary_phi_y(i, j, k - 1))/(abs(boundary_phi_y(i, j, k - 1)) + abs(boundary_phi_y(i, j, k)));
+								velocity_field_mac_ghost_y_z(i, j, k) = (theta - (T)1)/theta*water_velocity_field_mac_y(i, j, k - 1);
+							}
+							else if (boundary_phi_y(i, j, k + 1) < 0)
+							{
+								T theta = abs(boundary_phi_y(i, j, k + 1))/(abs(boundary_phi_y(i, j, k + 1)) + abs(boundary_phi_y(i, j, k)));
+								velocity_field_mac_ghost_y_z(i, j, k) = (theta - (T)1)/theta*water_velocity_field_mac_y(i, j, k + 1);
+							}
+							else
+							{
+								velocity_field_mac_ghost_y_x(i, j, k) = (T)0;
+								velocity_field_mac_ghost_y_z(i, j, k) = (T)0;
+							}
+						}	
+					}
+					multithreading.Sync(thread_id);
+				}
+				if (is_parallel)
+				{
+					// Periodic Boundary Condition
+					velocity_field_mac_ghost_x.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+					velocity_field_mac_ghost_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+					velocity_field_mac_ghost_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+
+					velocity_field_mac_ghost_x_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+					velocity_field_mac_ghost_x_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+					velocity_field_mac_ghost_y_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+					velocity_field_mac_ghost_y_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+					velocity_field_mac_ghost_z_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+					velocity_field_mac_ghost_z_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+
+					GRID_ITERATION_3D(boundary_phi_x.partial_grids[thread_id])
+					{
+						if (boundary_phi_x(i, j, k) > 0)
+						{	
+							if ((boundary_phi_x(i, j - 1, k) > 0) && (boundary_phi_x(i, j + 1, k) > 0) && (boundary_phi_x(i, j, k - 1) > 0) && (boundary_phi_x(i, j, k + 1) > 0))
+							{
+								velocity_field_mac_ghost_x_y(i, j, k) = (T)0;
+								velocity_field_mac_ghost_x_z(i, j, k) = (T)0;
+							}
+							else if (boundary_phi_x(i, j - 1, k) < -0)
+							{
+								T theta = abs(boundary_phi_x(i, j - 1, k))/(abs(boundary_phi_x(i, j - 1, k)) + abs(boundary_phi_x(i, j, k)));
+								velocity_field_mac_ghost_x_y(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j - 1, k);
+							}
+							else if (boundary_phi_x(i, j + 1, k) < -0)
+							{
+								T theta = abs(boundary_phi_x(i, j + 1, k))/(abs(boundary_phi_x(i, j + 1, k)) + abs(boundary_phi_x(i, j, k)));
+								velocity_field_mac_ghost_x_y(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j + 1, k);								
+							}
+							else if (boundary_phi_x(i, j, k - 1) < -0)
+							{
+								T theta = abs(boundary_phi_x(i, j, k - 1))/(abs(boundary_phi_x(i, j, k - 1)) + abs(boundary_phi_x(i, j, k)));
+								velocity_field_mac_ghost_x_z(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j, k - 1);
+							}
+							else if (boundary_phi_x(i, j, k + 1) < -0)
+							{
+								T theta = abs(boundary_phi_x(i, j, k + 1))/(abs(boundary_phi_x(i, j, k + 1)) + abs(boundary_phi_x(i, j, k)));
+								velocity_field_mac_ghost_x_z(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j, k + 1);
+							}
+							else
+							{
+								velocity_field_mac_ghost_x_y(i, j, k) = (T)0;
+								velocity_field_mac_ghost_x_z(i, j, k) = (T)0;
+							}
+						}
+					}
+					multithreading.Sync(thread_id);
+
+					GRID_ITERATION_3D(boundary_phi_z.partial_grids[thread_id])
+					{
+						if (boundary_phi_z(i, j, k) > 0)
+						{
+							if ((boundary_phi_z(i, j - 1, k) > 0) && (boundary_phi_z(i, j + 1, k) > 0) && (boundary_phi_z(i, j, k - 1) > 0) && (boundary_phi_z(i, j, k + 1) > 0))
+							{
+								velocity_field_mac_ghost_z_y(i, j, k) = (T)0;
+								velocity_field_mac_ghost_z_z(i, j, k) = (T)0;
+							}
+							else if (boundary_phi_z(i, j - 1, k) < -0)
+							{
+								T theta = abs(boundary_phi_z(i, j - 1, k))/(abs(boundary_phi_z(i, j - 1, k)) + abs(boundary_phi_z(i, j, k)));
+								velocity_field_mac_ghost_z_y(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j - 1, k);
+							}
+							else if (boundary_phi_z(i, j + 1, k) < -0)
+							{
+								T theta = abs(boundary_phi_z(i, j + 1, k))/(abs(boundary_phi_z(i, j + 1, k)) + abs(boundary_phi_z(i, j, k)));
+								velocity_field_mac_ghost_z_y(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j + 1, k);
+							}
+							else if (boundary_phi_z(i, j, k - 1) < -0)
+							{
+								T theta = abs(boundary_phi_z(i, j, k - 1))/(abs(boundary_phi_z(i, j, k - 1)) + abs(boundary_phi_z(i, j, k)));
+								velocity_field_mac_ghost_z_z(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k - 1);
+							}
+							else if (boundary_phi_z(i, j, k + 1) < -0)
+							{
+								T theta = abs(boundary_phi_z(i, j, k + 1))/(abs(boundary_phi_z(i, j, k + 1)) + abs(boundary_phi_z(i, j, k)));
+								velocity_field_mac_ghost_z_z(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k + 1);
+							}
+							else
+							{
+								velocity_field_mac_ghost_z_y(i, j, k) = (T)0;
+								velocity_field_mac_ghost_z_z(i, j, k) = (T)0;
+							}
+						}	
+					}
+					multithreading.Sync(thread_id);
+
+					GRID_ITERATION_3D(boundary_phi_y.partial_grids[thread_id])
+					{
+						if (boundary_phi_y(i, j, k) > 0)
+						{
+							if ((boundary_phi_y(i, j - 1, k) > 0) && (boundary_phi_y(i, j + 1, k) > 0) && (boundary_phi_y(i, j, k - 1) > 0) && (boundary_phi_y(i, j, k + 1) > 0))
+							{
+								velocity_field_mac_ghost_y_y(i, j, k) = (T)0;
+								velocity_field_mac_ghost_y_z(i, j, k) = (T)0;
+							}
+							else if (boundary_phi_y(i, j - 1, k) < 0)
+							{
+								T theta = abs(boundary_phi_y(i, j - 1, k))/(abs(boundary_phi_y(i, j - 1, k)) + abs(boundary_phi_y(i, j, k)));
+								velocity_field_mac_ghost_y_y(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j - 1, k);
+							}
+							else if (boundary_phi_y(i, j + 1, k) < 0)
+							{
+								T theta = abs(boundary_phi_y(i, j + 1, k))/(abs(boundary_phi_y(i, j + 1, k)) + abs(boundary_phi_y(i, j, k)));
+								velocity_field_mac_ghost_y_y(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j + 1, k);
+							}
+							else if (boundary_phi_y(i, j, k - 1) < 0)
+							{
+								T theta = abs(boundary_phi_y(i, j, k - 1))/(abs(boundary_phi_y(i, j, k - 1)) + abs(boundary_phi_y(i, j, k)));
+								velocity_field_mac_ghost_y_z(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j, k - 1);
+							}
+							else if (boundary_phi_y(i, j, k + 1) < 0)
+							{
+								T theta = abs(boundary_phi_y(i, j, k + 1))/(abs(boundary_phi_y(i, j, k + 1)) + abs(boundary_phi_y(i, j, k)));
+								velocity_field_mac_ghost_y_z(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j, k + 1);
+							}
+							else
+							{
+								velocity_field_mac_ghost_y_y(i, j, k) = (T)0;
+								velocity_field_mac_ghost_y_z(i, j, k) = (T)0;
+							}
+						}	
+					}
+					multithreading.Sync(thread_id);
+				}
+			} 
+		}
+		if (boundary_order_velocity == 2)
+		{
 			if (is_vertical)
 			{
 				// Periodic Boundary Condition
 				velocity_field_mac_ghost_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
 				velocity_field_mac_ghost_y.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
 				velocity_field_mac_ghost_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-							
+
 				velocity_field_mac_ghost_x_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
 				velocity_field_mac_ghost_x_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
 				velocity_field_mac_ghost_y_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
@@ -1606,29 +2384,29 @@ public: // Member Functions
 					{	
 						if ((boundary_phi_x(i - 1, j, k) > 0) && (boundary_phi_x(i + 1, j, k) > 0) && (boundary_phi_x(i, j, k - 1) > 0) && (boundary_phi_x(i, j, k + 1) > 0))
 						{
-							
+
 							velocity_field_mac_ghost_x_x(i, j, k) = (T)0;
 							velocity_field_mac_ghost_x_z(i, j, k) = (T)0;
 						}
 						else if (boundary_phi_x(i - 1, j, k) < 0)
 						{
 							T theta = abs(boundary_phi_x(i - 1, j, k))/(abs(boundary_phi_x(i - 1, j, k)) + abs(boundary_phi_x(i, j, k)));
-							velocity_field_mac_ghost_x_x(i, j, k) = (theta - (T)1)/theta*velocity_field_mac_ghost_x(i - 1, j, k);
+							velocity_field_mac_ghost_x_x(i, j, k) = (theta - (T)1)/theta*((T)2*velocity_field_mac_ghost_x(i - 1, j, k) - velocity_field_mac_ghost_x(i - 2, j, k));
 						}
 						else if (boundary_phi_x(i + 1, j, k) < 0)
 						{
 							T theta = abs(boundary_phi_x(i + 1, j, k))/(abs(boundary_phi_x(i + 1, j, k)) + abs(boundary_phi_x(i, j, k)));
-							velocity_field_mac_ghost_x_x(i, j, k) = (theta - (T)1)/theta*velocity_field_mac_ghost_x(i + 1, j, k);								
+							velocity_field_mac_ghost_x_x(i, j, k) = (theta - (T)1)/theta*((T)2*velocity_field_mac_ghost_x(i + 1, j, k) - velocity_field_mac_ghost_x(i + 2, j, k));								
 						}
 						else if (boundary_phi_x(i, j, k - 1) < 0)
 						{
 							T theta = abs(boundary_phi_x(i, j, k - 1))/(abs(boundary_phi_x(i, j, k - 1)) + abs(boundary_phi_x(i, j, k)));
-							velocity_field_mac_ghost_x_z(i, j, k) = (theta - (T)1)/theta*velocity_field_mac_ghost_x(i, j, k - 1);
+							velocity_field_mac_ghost_x_z(i, j, k) = (theta - (T)1)/theta*((T)2*velocity_field_mac_ghost_x(i, j, k - 1) - velocity_field_mac_ghost_x(i, j, k - 2));
 						}
 						else if (boundary_phi_x(i, j, k + 1) < 0)
 						{
 							T theta = abs(boundary_phi_x(i, j, k + 1))/(abs(boundary_phi_x(i, j, k + 1)) + abs(boundary_phi_x(i, j, k)));
-							velocity_field_mac_ghost_x_z(i, j, k) = (theta - (T)1)/theta*velocity_field_mac_ghost_x(i, j, k + 1);
+							velocity_field_mac_ghost_x_z(i, j, k) = (theta - (T)1)/theta*((T)2*velocity_field_mac_ghost_x(i, j, k + 1) - velocity_field_mac_ghost_x(i, j, k + 2));
 						}
 						else
 						{
@@ -1651,22 +2429,22 @@ public: // Member Functions
 						else if (boundary_phi_z(i - 1, j, k) < 0)
 						{
 							T theta = abs(boundary_phi_z(i - 1, j, k))/(abs(boundary_phi_z(i - 1, j, k)) + abs(boundary_phi_z(i, j, k)));
-							velocity_field_mac_ghost_z_x(i, j, k) = (theta - (T)1)/theta*velocity_field_mac_ghost_z(i - 1, j, k);
+							velocity_field_mac_ghost_z_x(i, j, k) = (theta - (T)1)/theta*((T)2*velocity_field_mac_ghost_z(i - 1, j, k) - velocity_field_mac_ghost_z(i - 2, j, k));
 						}
 						else if (boundary_phi_z(i + 1, j, k) < 0)
 						{
 							T theta = abs(boundary_phi_z(i + 1, j, k))/(abs(boundary_phi_z(i + 1, j, k)) + abs(boundary_phi_z(i, j, k)));
-							velocity_field_mac_ghost_z_x(i, j, k) = (theta - (T)1)/theta*velocity_field_mac_ghost_z(i + 1, j, k);
+							velocity_field_mac_ghost_z_x(i, j, k) = (theta - (T)1)/theta*((T)2*velocity_field_mac_ghost_z(i + 1, j, k) - velocity_field_mac_ghost_z(i + 2, j, k));
 						}
 						else if (boundary_phi_z(i, j, k - 1) < 0)
 						{
 							T theta = abs(boundary_phi_z(i, j, k - 1))/(abs(boundary_phi_z(i, j, k - 1)) + abs(boundary_phi_z(i, j, k)));
-							velocity_field_mac_ghost_z_z(i, j, k) = (theta - (T)1)/theta*velocity_field_mac_ghost_z(i, j, k - 1);
+							velocity_field_mac_ghost_z_z(i, j, k) = (theta - (T)1)/theta*((T)2*velocity_field_mac_ghost_z(i, j, k - 1) - velocity_field_mac_ghost_z(i, j, k - 2));
 						}
 						else if (boundary_phi_z(i, j, k + 1) < 0)
 						{
 							T theta = abs(boundary_phi_z(i, j, k + 1))/(abs(boundary_phi_z(i, j, k + 1)) + abs(boundary_phi_z(i, j, k)));
-							velocity_field_mac_ghost_z_z(i, j, k) = (theta - (T)1)/theta*velocity_field_mac_ghost_z(i, j, k + 1);
+							velocity_field_mac_ghost_z_z(i, j, k) = (theta - (T)1)/theta*((T)2*velocity_field_mac_ghost_z(i, j, k + 1) - velocity_field_mac_ghost_z(i, j, k + 2));
 						}
 						else
 						{
@@ -1676,7 +2454,7 @@ public: // Member Functions
 					}	
 				}
 				multithreading.Sync(thread_id);
-			
+
 				GRID_ITERATION_3D(boundary_phi_y.partial_grids[thread_id])
 				{
 					if (boundary_phi_y(i, j, k) > 0)
@@ -1689,22 +2467,22 @@ public: // Member Functions
 						else if (boundary_phi_y(i - 1, j, k) < 0)
 						{
 							T theta = abs(boundary_phi_y(i - 1, j, k))/(abs(boundary_phi_y(i - 1, j, k)) + abs(boundary_phi_y(i, j, k)));
-							velocity_field_mac_ghost_y_x(i, j, k) = (theta - (T)1)/theta*water_velocity_field_mac_y(i - 1, j, k);
+							velocity_field_mac_ghost_y_x(i, j, k) = (theta - (T)1)/theta*((T)2*water_velocity_field_mac_y(i - 1, j, k) - water_velocity_field_mac_y(i - 2, j, k));
 						}
 						else if (boundary_phi_y(i + 1, j, k) < 0)
 						{
 							T theta = abs(boundary_phi_y(i + 1, j, k))/(abs(boundary_phi_y(i + 1, j, k)) + abs(boundary_phi_y(i, j, k)));
-							velocity_field_mac_ghost_y_x(i, j, k) = (theta - (T)1)/theta*water_velocity_field_mac_y(i + 1, j, k);
+							velocity_field_mac_ghost_y_x(i, j, k) = (theta - (T)1)/theta*((T)2*water_velocity_field_mac_y(i + 1, j, k) - water_velocity_field_mac_y(i + 2, j, k));
 						}
 						else if (boundary_phi_y(i, j, k - 1) < 0)
 						{
 							T theta = abs(boundary_phi_y(i, j, k - 1))/(abs(boundary_phi_y(i, j, k - 1)) + abs(boundary_phi_y(i, j, k)));
-							velocity_field_mac_ghost_y_z(i, j, k) = (theta - (T)1)/theta*water_velocity_field_mac_y(i, j, k - 1);
+							velocity_field_mac_ghost_y_z(i, j, k) = (theta - (T)1)/theta*((T)2*water_velocity_field_mac_y(i, j, k - 1) - water_velocity_field_mac_y(i, j, k - 2));
 						}
 						else if (boundary_phi_y(i, j, k + 1) < 0)
 						{
 							T theta = abs(boundary_phi_y(i, j, k + 1))/(abs(boundary_phi_y(i, j, k + 1)) + abs(boundary_phi_y(i, j, k)));
-							velocity_field_mac_ghost_y_z(i, j, k) = (theta - (T)1)/theta*water_velocity_field_mac_y(i, j, k + 1);
+							velocity_field_mac_ghost_y_z(i, j, k) = (theta - (T)1)/theta*((T)2*water_velocity_field_mac_y(i, j, k + 1) - water_velocity_field_mac_y(i, j, k + 2));
 						}
 						else
 						{
@@ -1721,7 +2499,7 @@ public: // Member Functions
 				velocity_field_mac_ghost_x.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
 				velocity_field_mac_ghost_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
 				velocity_field_mac_ghost_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-			
+
 				velocity_field_mac_ghost_x_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
 				velocity_field_mac_ghost_x_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
 				velocity_field_mac_ghost_y_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
@@ -1741,22 +2519,22 @@ public: // Member Functions
 						else if (boundary_phi_x(i, j - 1, k) < -0)
 						{
 							T theta = abs(boundary_phi_x(i, j - 1, k))/(abs(boundary_phi_x(i, j - 1, k)) + abs(boundary_phi_x(i, j, k)));
-							velocity_field_mac_ghost_x_y(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j - 1, k);
+							velocity_field_mac_ghost_x_y(i, j, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_x(i, j - 1, k) - velocity_field_mac_ghost_x(i, j - 2, k));
 						}
 						else if (boundary_phi_x(i, j + 1, k) < -0)
 						{
 							T theta = abs(boundary_phi_x(i, j + 1, k))/(abs(boundary_phi_x(i, j + 1, k)) + abs(boundary_phi_x(i, j, k)));
-							velocity_field_mac_ghost_x_y(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j + 1, k);								
+							velocity_field_mac_ghost_x_y(i, j, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_x(i, j + 1, k) - velocity_field_mac_ghost_x(i, j + 2, k));								
 						}
 						else if (boundary_phi_x(i, j, k - 1) < -0)
 						{
 							T theta = abs(boundary_phi_x(i, j, k - 1))/(abs(boundary_phi_x(i, j, k - 1)) + abs(boundary_phi_x(i, j, k)));
-							velocity_field_mac_ghost_x_z(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j, k - 1);
+							velocity_field_mac_ghost_x_z(i, j, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_x(i, j, k - 1) - velocity_field_mac_ghost_x(i, j, k - 2));
 						}
 						else if (boundary_phi_x(i, j, k + 1) < -0)
 						{
 							T theta = abs(boundary_phi_x(i, j, k + 1))/(abs(boundary_phi_x(i, j, k + 1)) + abs(boundary_phi_x(i, j, k)));
-							velocity_field_mac_ghost_x_z(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_x(i, j, k + 1);
+							velocity_field_mac_ghost_x_z(i, j, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_x(i, j, k + 1) - velocity_field_mac_ghost_x(i, j, k + 2));
 						}
 						else
 						{
@@ -1779,22 +2557,22 @@ public: // Member Functions
 						else if (boundary_phi_z(i, j - 1, k) < -0)
 						{
 							T theta = abs(boundary_phi_z(i, j - 1, k))/(abs(boundary_phi_z(i, j - 1, k)) + abs(boundary_phi_z(i, j, k)));
-							velocity_field_mac_ghost_z_y(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j - 1, k);
+							velocity_field_mac_ghost_z_y(i, j, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_z(i, j - 1, k) - velocity_field_mac_ghost_z(i, j - 2, k));
 						}
 						else if (boundary_phi_z(i, j + 1, k) < -0)
 						{
 							T theta = abs(boundary_phi_z(i, j + 1, k))/(abs(boundary_phi_z(i, j + 1, k)) + abs(boundary_phi_z(i, j, k)));
-							velocity_field_mac_ghost_z_y(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j + 1, k);
+							velocity_field_mac_ghost_z_y(i, j, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_z(i, j + 1, k) - velocity_field_mac_ghost_z(i, j + 2, k));
 						}
 						else if (boundary_phi_z(i, j, k - 1) < -0)
 						{
 							T theta = abs(boundary_phi_z(i, j, k - 1))/(abs(boundary_phi_z(i, j, k - 1)) + abs(boundary_phi_z(i, j, k)));
-							velocity_field_mac_ghost_z_z(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k - 1);
+							velocity_field_mac_ghost_z_z(i, j, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_z(i, j, k - 1) - velocity_field_mac_ghost_z(i, j, k - 2));
 						}
 						else if (boundary_phi_z(i, j, k + 1) < -0)
 						{
 							T theta = abs(boundary_phi_z(i, j, k + 1))/(abs(boundary_phi_z(i, j, k + 1)) + abs(boundary_phi_z(i, j, k)));
-							velocity_field_mac_ghost_z_z(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k + 1);
+							velocity_field_mac_ghost_z_z(i, j, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_z(i, j, k + 1) - velocity_field_mac_ghost_z(i, j, k + 2));
 						}
 						else
 						{
@@ -1804,7 +2582,7 @@ public: // Member Functions
 					}	
 				}
 				multithreading.Sync(thread_id);
-			
+
 				GRID_ITERATION_3D(boundary_phi_y.partial_grids[thread_id])
 				{
 					if (boundary_phi_y(i, j, k) > 0)
@@ -1817,22 +2595,22 @@ public: // Member Functions
 						else if (boundary_phi_y(i, j - 1, k) < 0)
 						{
 							T theta = abs(boundary_phi_y(i, j - 1, k))/(abs(boundary_phi_y(i, j - 1, k)) + abs(boundary_phi_y(i, j, k)));
-							velocity_field_mac_ghost_y_y(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j - 1, k);
+							velocity_field_mac_ghost_y_y(i, j, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_y(i, j - 1, k) - velocity_field_mac_ghost_y(i, j - 2, k));
 						}
 						else if (boundary_phi_y(i, j + 1, k) < 0)
 						{
 							T theta = abs(boundary_phi_y(i, j + 1, k))/(abs(boundary_phi_y(i, j + 1, k)) + abs(boundary_phi_y(i, j, k)));
-							velocity_field_mac_ghost_y_y(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j + 1, k);
+							velocity_field_mac_ghost_y_y(i, j, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_y(i, j + 1, k) - velocity_field_mac_ghost_y(i, j + 2, k));
 						}
 						else if (boundary_phi_y(i, j, k - 1) < 0)
 						{
 							T theta = abs(boundary_phi_y(i, j, k - 1))/(abs(boundary_phi_y(i, j, k - 1)) + abs(boundary_phi_y(i, j, k)));
-							velocity_field_mac_ghost_y_z(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j, k - 1);
+							velocity_field_mac_ghost_y_z(i, j, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_y(i, j, k - 1) - velocity_field_mac_ghost_y(i, j, k - 2));
 						}
 						else if (boundary_phi_y(i, j, k + 1) < 0)
 						{
 							T theta = abs(boundary_phi_y(i, j, k + 1))/(abs(boundary_phi_y(i, j, k + 1)) + abs(boundary_phi_y(i, j, k)));
-							velocity_field_mac_ghost_y_z(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j, k + 1);
+							velocity_field_mac_ghost_y_z(i, j, k) = (theta - 1)/theta*((T)2*velocity_field_mac_ghost_y(i, j, k + 1) - velocity_field_mac_ghost_y(i, j, k + 2));
 						}
 						else
 						{
@@ -1843,6 +2621,6 @@ public: // Member Functions
 				}
 				multithreading.Sync(thread_id);
 			}
-		}
+		} 
 	}
 };

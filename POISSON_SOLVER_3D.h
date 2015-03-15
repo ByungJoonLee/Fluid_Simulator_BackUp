@@ -160,14 +160,58 @@ public: // Initialization Functions
 	}
 
 public: // Member Functions
-	void Solve(const int& thread_id, FIELD_STRUCTURE_3D<T>& pressure, FIELD_STRUCTURE_3D<T>& density, FIELD_STRUCTURE_3D<int>& bc, const FIELD_STRUCTURE_3D<T>& div, const FIELD_STRUCTURE_3D<T>& variable, const LEVELSET_3D& levelset,  const LEVELSET_3D& boundary_levelset, const FIELD_STRUCTURE_3D<T>& jc_on_solution, const FIELD_STRUCTURE_3D<T>& jc_on_derivative)
+	void Solve(const int& thread_id, FIELD_STRUCTURE_3D<T>& pressure, FIELD_STRUCTURE_3D<T>& density, FIELD_STRUCTURE_3D<int>& bc, const FIELD_STRUCTURE_3D<T>& div, const FIELD_STRUCTURE_3D<T>& variable, const LEVELSET_3D& levelset, LEVELSET_3D& boundary_levelset, const FIELD_STRUCTURE_3D<T>& jc_on_solution, const FIELD_STRUCTURE_3D<T>& jc_on_derivative)
 	{
 		assert(linear_solver != 0);
 
 		LOG::Begin(thread_id, "Poisson Solve");
 
 		BuildLinearSystemNodeJumpConditionVaribleCoefficient(thread_id, A, x, b, pressure, variable, bc, div, levelset, boundary_levelset, jc_on_solution, jc_on_derivative);
-		
+		//BuildLinearSystemNodeJumpConditionVaribleCoefficientPurvis(thread_id, A, x, b, pressure, variable, bc, div, levelset, boundary_levelset, jc_on_solution, jc_on_derivative);
+	
+		ofstream fout;
+		fout.open("A");
+		fout << "nz = [ ";
+		for (int i = 0; i < A.nz; i++)
+		{
+			fout << A.values[i] << " ";
+		}
+		fout << "]" << endl;
+	
+		fout << "ci = [ ";
+		for (int i = 0; i < A.nz; i++)
+		{
+			fout << A.column_index[i] << " ";
+		}
+		fout << "]" << endl;
+
+		fout << "rp = [ ";
+		for (int i = 0; i <= A.N; i++)
+		{
+			fout << A.row_ptr[i] << " ";
+		}
+		fout << "]" << endl;
+		fout.close();
+
+		// Symmetric property test
+		BEGIN_HEAD_THREAD_WORK
+		{
+			cout << A(1,908) << endl;
+			cout << A(908,1) << endl;
+			/*for (int i = 0; i < A.N; i++)
+			{
+				for (int j = 0; j < A.N; j++)
+				{
+					if (A(i, j) != A(j, i))
+					{
+						cout << i << ", " << j << endl;
+						cout << "Non-symmetric" << endl;
+					}
+				}
+			}*/
+		}
+		END_HEAD_THREAD_WORK;
+
 		T sum_for_b(0);
 		
 		if (Neumann_Boundary_Condition)
@@ -499,6 +543,40 @@ public: // Member Functions
 		return full_ix;
 	}
 
+	int AssignSequentialindicesToFullCellsPurvis(const int& thread_id, const FIELD_STRUCTURE_3D<int>& bc, LEVELSET_3D& levelset)
+	{
+		// Count number of full cells in this thread domain
+		int full_ix(0);
+
+		BEGIN_GRID_ITERATION_3D(bc.partial_grids[thread_id])
+		{
+			if(bc(i, j, k) > -1) ++full_ix;
+			if(bc(i, j, k) == BC_NEUM && levelset.IsCellContained(i, j, k) == true) ++full_ix;
+		}
+		END_GRID_ITERATION_3D;
+
+		int start_full_ix, end_full_ix;
+		multithreading->SyncDomainIndices1D(thread_id, full_ix, start_full_ix, end_full_ix);
+
+		BEGIN_GRID_ITERATION_3D(bc.partial_grids[thread_id])
+		{
+			if(bc(i, j, k) > -1) bc(i, j, k) = start_full_ix++;
+		}
+		END_GRID_ITERATION_3D;
+
+		BEGIN_GRID_ITERATION_3D(bc.partial_grids[thread_id])
+		{
+			if(bc(i, j, k) == BC_NEUM && levelset.IsCellContained(i, j, k) == true) bc(i, j, k) = start_full_ix++;
+		}
+		END_GRID_ITERATION_3D;
+
+		assert(start_full_ix - 1 == end_full_ix);
+
+		multithreading->SyncSum(thread_id, full_ix);
+
+		return full_ix;
+	}
+
 	int CountNonZeroElements(const int& thread_id, const FIELD_STRUCTURE_3D<int>& bc)
 	{
 		int nnz(0);
@@ -514,6 +592,41 @@ public: // Member Functions
 				if(bc(i, j-1, k) > -1) nnz++;
 				if(bc(i, j, k+1) > -1) nnz++;
 				if(bc(i, j, k-1) > -1) nnz++;
+				// For Periodic Boundary Condition
+				if(bc(i+1, j, k) == BC_PER) nnz++;
+				if(bc(i-1, j, k) == BC_PER) nnz++;
+				if(bc(i, j+1, k) == BC_PER) nnz++;
+				if(bc(i, j-1, k) == BC_PER) nnz++;
+				if(bc(i, j, k+1) == BC_PER) nnz++;
+				if(bc(i, j, k-1) == BC_PER) nnz++;
+			}
+		}
+		END_GRID_ITERATION_SUM(nnz);
+
+		return nnz;
+	}
+
+	int CountNonZeroElementsPurvis(const int& thread_id, const FIELD_STRUCTURE_3D<int>& bc)
+	{
+		int nnz(0);
+
+		BEGIN_GRID_ITERATION_3D(bc.partial_grids[thread_id])
+		{
+			if(bc(i, j, k) > -1)
+			{
+				nnz++;
+				if(bc(i+1, j, k) > -1) nnz++;
+				if(bc(i-1, j, k) > -1) nnz++;
+				if(bc(i, j+1, k) > -1) nnz++;
+				if(bc(i, j-1, k) > -1) nnz++;
+				if(bc(i, j, k+1) > -1) nnz++;
+				if(bc(i, j, k-1) > -1) nnz++;
+				if(bc(i+1, j, k) == BC_NEUM) nnz++;
+				if(bc(i-1, j, k) == BC_NEUM) nnz++;
+				if(bc(i, j+1, k) == BC_NEUM) nnz++;
+				if(bc(i, j-1, k) == BC_NEUM) nnz++;
+				if(bc(i, j, k+1) == BC_NEUM) nnz++;
+				if(bc(i, j, k-1) == BC_NEUM) nnz++;
 				// For Periodic Boundary Condition
 				if(bc(i+1, j, k) == BC_PER) nnz++;
 				if(bc(i-1, j, k) == BC_PER) nnz++;
@@ -913,13 +1026,13 @@ public: // Member Functions
 	{
 		const int num_all_full_cells = AssignSequentialindicesToFullCells(thread_id, bc);
 		const int nnz = CountNonZeroElements(thread_id, bc);
-		
+
 		// Initialize A matrix, x vector, and b vector
 		HEAD_THREAD_WORK(A_matrix.Initialize(multithreading, num_all_full_cells, nnz));
 		HEAD_THREAD_WORK(x_vector.Initialize(num_all_full_cells, true));
 		HEAD_THREAD_WORK(b_vector.Initialize(num_all_full_cells));
 		HEAD_THREAD_WORK(multithreading->SplitDomainIndex1D(0, num_all_full_cells));
-
+		
 		BEGIN_HEAD_THREAD_WORK
 		{
 			A_matrix.start_ix[0] = 0;
@@ -1665,6 +1778,1551 @@ public: // Member Functions
 				}
 	
 				T F_X = F_L + F_R, F_Y = F_B + F_T, F_Z = F_D + F_U;
+	
+				b_vector[bc(i, j, k)] = -div(i, j, k) - F_X - F_Y - F_Z;
+				
+				if (bc(i - 1, j, k) == BC_DIR)
+				{
+					b_vector[bc(i, j, k)] += beta_l*inv_dxdx*pressure(i - 1, j, k);
+				}
+				if (bc(i + 1, j, k) == BC_DIR)
+				{
+					b_vector[bc(i, j, k)] += beta_r*inv_dxdx*pressure(i + 1, j, k);
+				}
+				if (bc(i, j - 1, k) == BC_DIR)
+				{
+					b_vector[bc(i, j, k)] += beta_b*inv_dydy*pressure(i, j - 1, k);
+				}
+				if (bc(i, j + 1, k) == BC_DIR)
+				{
+					b_vector[bc(i, j, k)] += beta_t*inv_dydy*pressure(i, j + 1, k);
+				}
+				if (bc(i, j, k - 1) == BC_DIR)
+				{
+					b_vector[bc(i, j, k)] += beta_d*inv_dzdz*pressure(i, j, k - 1);
+				}		
+				if (bc(i, j, k + 1) == BC_DIR)
+				{
+					b_vector[bc(i, j, k)] += beta_u*inv_dzdz*pressure(i, j, k + 1);
+				}		
+	
+				x_vector[bc(i, j, k)] = pressure(i, j, k);
+			}
+			END_GRID_ITERATION_3D;
+		}
+	}
+	
+	void BuildLinearSystemNodeJumpConditionVaribleCoefficientPurvis(const int& thread_id, CSR_MATRIX<T>& A_matrix, VECTOR_ND<T>& x_vector, VECTOR_ND<T>& b_vector, const FIELD_STRUCTURE_3D<T>& pressure, const FIELD_STRUCTURE_3D<T>& variable, const FIELD_STRUCTURE_3D<int>& bc, const FIELD_STRUCTURE_3D<T>& div, const LEVELSET_3D& levelset, LEVELSET_3D& boundary_levelset, const FIELD_STRUCTURE_3D<T>& jc_on_solution, const FIELD_STRUCTURE_3D<T>& jc_on_derivative)
+	{
+		const int num_all_full_cells = AssignSequentialindicesToFullCellsPurvis(thread_id, bc, boundary_levelset);
+		const int nnz = CountNonZeroElements(thread_id, bc);
+		
+		// Initialize A matrix, x vector, and b vector
+		HEAD_THREAD_WORK(A_matrix.Initialize(multithreading, num_all_full_cells, nnz));
+		HEAD_THREAD_WORK(x_vector.Initialize(num_all_full_cells, true));
+		HEAD_THREAD_WORK(b_vector.Initialize(num_all_full_cells));
+		HEAD_THREAD_WORK(multithreading->SplitDomainIndex1D(0, num_all_full_cells));
+
+		BEGIN_HEAD_THREAD_WORK
+		{
+			A_matrix.start_ix[0] = 0;
+			A_matrix.end_ix[0] = multithreading->sync_value_int[0] - 1;
+			A_matrix.prev_row_array[0] = -1;
+			A_matrix.values_ix_array[0] = 0;
+			for (int thread_id = 1; thread_id < multithreading->num_threads; thread_id++)
+			{
+				A_matrix.start_ix[thread_id] = A_matrix.end_ix[thread_id - 1] + 1;
+				A_matrix.end_ix[thread_id] = A_matrix.end_ix[thread_id - 1] + multithreading->sync_value_int[thread_id];
+				A_matrix.prev_row_array[thread_id] = -1;
+				A_matrix.values_ix_array[thread_id] = A_matrix.start_ix[thread_id];
+			}
+		}
+		END_HEAD_THREAD_WORK
+
+		// Speed up variables 
+		int i_start(pressure.i_start), i_end(pressure.i_end), j_start(pressure.j_start), j_end(pressure.j_end);
+		T dx(pressure.dx), dy(pressure.dy), one_over_dx(pressure.one_over_dx), one_over_dy(pressure.one_over_dy), one_over_dz(pressure.one_over_dz), one_over_dx2(pressure.one_over_dx2), one_over_dy2(pressure.one_over_dy2), one_over_dz2(pressure.one_over_dz2);
+
+		const T dxdx = POW2(pressure.grid.dx), inv_dxdx = (T)1/dxdx, dydy = POW2(pressure.grid.dy), inv_dydy = (T)1/dydy, dzdz = POW2(pressure.grid.dz), inv_dzdz = (T)1/dzdz;
+		
+		int i_start_for_domain(0), j_start_for_domain(0), k_start_for_domain(0);
+
+		if (air_water_simulation)
+		{
+			BEGIN_GRID_ITERATION_3D(pressure.partial_grids[thread_id])
+			{
+				if (bc(i, j, k) < 0)
+				{
+					continue;
+				}
+
+				T coef_ijk = 0;					// For optimization, inv_dxdx is multiplied at the end
+				
+				// Define betas
+				T beta_l, beta_r, beta_b, beta_t, beta_d, beta_u;
+				T levelset_c = levelset(i, j, k), levelset_l = levelset(i - 1, j, k), levelset_r = levelset(i + 1, j, k), levelset_b = levelset(i, j - 1, k), levelset_t = levelset(i, j + 1, k), levelset_d = levelset(i, j, k - 1), levelset_u = levelset(i, j, k + 1);
+	
+				beta_l = variable(i, j, k)*variable(i - 1, j, k)*(abs(levelset_l) + abs(levelset_c))/(variable(i, j, k)*abs(levelset_l) + variable(i - 1, j, k)*abs(levelset_c));
+				beta_r = variable(i, j, k)*variable(i + 1, j, k)*(abs(levelset_r) + abs(levelset_c))/(variable(i + 1, j, k)*abs(levelset_c) + variable(i, j, k)*abs(levelset_r));
+				beta_b = variable(i, j, k)*variable(i, j - 1, k)*(abs(levelset_b) + abs(levelset_c))/(variable(i, j, k)*abs(levelset_b) + variable(i, j - 1, k)*abs(levelset_c));
+				beta_t = variable(i, j, k)*variable(i, j + 1, k)*(abs(levelset_t) + abs(levelset_c))/(variable(i, j + 1, k)*abs(levelset_c) + variable(i, j, k)*abs(levelset_t));
+				beta_d = variable(i, j, k)*variable(i, j, k - 1)*(abs(levelset_d) + abs(levelset_c))/(variable(i, j, k)*abs(levelset_d) + variable(i, j, k - 1)*abs(levelset_c));
+				beta_u = variable(i, j, k)*variable(i, j, k + 1)*(abs(levelset_u) + abs(levelset_c))/(variable(i, j, k + 1)*abs(levelset_c) + variable(i, j, k)*abs(levelset_u));
+
+				// If neighbor is full cell
+				if (bc(i - 1, j, k) > -1)
+				{
+					coef_ijk += beta_l;
+					A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -beta_l*inv_dxdx);
+				}
+				if (bc(i + 1, j, k) > -1)
+				{
+					coef_ijk += beta_r;
+					A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -beta_r*inv_dxdx);
+				}
+				if (bc(i, j - 1, k) > -1)
+				{
+					coef_ijk += beta_b;
+					A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -beta_b*inv_dydy);
+				}
+				if (bc(i, j + 1, k) > -1)
+				{
+					coef_ijk += beta_t;
+					A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -beta_t*inv_dydy);
+				}
+				if (bc(i, j, k - 1) > -1)
+				{
+					coef_ijk += beta_d;
+					A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -beta_d*inv_dzdz);
+				}
+				if (bc(i, j, k + 1) > -1)
+				{
+					coef_ijk += beta_u;
+					A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -beta_u*inv_dzdz);
+				}
+				
+				if (bc(i - 1, j, k) == BC_DIR)
+				{
+					coef_ijk += beta_l;
+				}
+				if (bc(i + 1, j, k) == BC_DIR)
+				{
+					coef_ijk += beta_r;
+				}
+				if (bc(i, j - 1, k) == BC_DIR)
+				{
+					coef_ijk += beta_b;
+				}
+				if (bc(i, j + 1, k) == BC_DIR)
+				{
+					coef_ijk += beta_t;
+				}
+				if (bc(i, j, k - 1) == BC_DIR)
+				{
+					coef_ijk += beta_d;
+				}
+				if (bc(i, j, k + 1) == BC_DIR)
+				{
+					coef_ijk += beta_u;
+				}
+				
+				// For saving starting index of the given domain
+				if (bc(i, j, k) == 0)
+				{
+					i_start_for_domain = i;
+					j_start_for_domain = j;
+					k_start_for_domain = k;
+				}
+				
+				// Tuning the given matrix into the invertiable matrix -- "On deflation and singular symmetric positive semi-definite matrices -- J.M.Tang, C.Vuik"
+				if ((thread_id == 0) && (i == i_start_for_domain) && (j == j_start_for_domain) && (k == k_start_for_domain))
+				{
+					if (bc(i - 1, j, k) == BC_NEUM)
+					{
+						coef_ijk += 0;
+					}
+					if (bc(i + 1, j, k) == BC_NEUM)
+					{
+						coef_ijk += 0;
+					}
+					if (bc(i, j - 1, k) == BC_NEUM)
+					{
+						coef_ijk += beta_b;
+					}
+					if (bc(i, j + 1, k) == BC_NEUM)
+					{
+						coef_ijk += 0;
+					}
+					if (bc(i, j, k - 1) == BC_NEUM)
+					{
+						coef_ijk += beta_d;
+					}
+					if (bc(i, j, k + 1) == BC_NEUM)
+					{
+						coef_ijk += beta_u;
+					}
+				}
+				else
+				{
+					if (bc(i - 1, j, k) == BC_NEUM)
+					{
+						coef_ijk += 0;
+					}
+					if (bc(i + 1, j, k) == BC_NEUM)
+					{
+						coef_ijk += 0;
+					}
+					if (bc(i, j - 1, k) == BC_NEUM)
+					{
+						coef_ijk += 0;
+					}
+					if (bc(i, j + 1, k) == BC_NEUM)
+					{
+						coef_ijk += 0;
+					}
+					if (bc(i, j, k - 1) == BC_NEUM)
+					{
+						coef_ijk += 0;
+					}
+					if (bc(i, j, k + 1) == BC_NEUM)
+					{
+						coef_ijk += 0;
+					}
+				}
+							
+				if (coef_ijk == 0)
+				{
+					coef_ijk = 1;
+				}
+
+				A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k), inv_dxdx*(T)coef_ijk);
+				
+				// Divide given region into different region - Boundary Capturing method for Poisson Equation on irregular domain
+				T F_L, F_R, F_B ,F_T, F_D, F_U;
+					
+				// Left arm Stencil
+				T subcell_l = abs(levelset(i - 1, j, k))/(abs(levelset(i, j, k)) + abs(levelset(i - 1, j, k)));
+				T a_l = (jc_on_solution(i, j, k)*abs(levelset(i - 1, j, k)) + jc_on_solution(i - 1, j, k)*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i - 1, j, k)));
+				T b_l = (jc_on_derivative(i, j, k)*levelset.normal(i, j, k).x*abs(levelset(i - 1, j, k)) + jc_on_derivative(i - 1, j, k)*levelset.normal(i - 1, j, k).x*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i - 1, j, k)));
+				
+				if (((levelset(i, j, k) <= 0) && (levelset(i - 1, j, k) <= 0)) || ((levelset(i, j, k) > 0) && (levelset(i - 1, j, k) > 0)))
+				{
+					F_L = 0;
+				}
+				else if ((levelset(i, j, k) <= 0) && (levelset(i - 1, j, k) > 0))
+				{
+					F_L = one_over_dx2*a_l*beta_l - one_over_dx*beta_l*b_l*subcell_l/variable(i - 1, j, k);
+				}
+				else if ((levelset(i, j, k) > 0) && (levelset(i - 1, j, k) <= 0))
+				{
+					F_L = -one_over_dx2*a_l*beta_l + one_over_dx*beta_l*b_l*subcell_l/variable(i - 1, j, k);
+				}
+	
+				// Right arm Stencil
+				T subcell_r = abs(levelset(i + 1, j, k))/(abs(levelset(i, j, k)) + abs(levelset(i + 1, j, k)));
+				T a_r = (jc_on_solution(i, j, k)*abs(levelset(i + 1, j, k)) + jc_on_solution(i + 1, j, k)*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i + 1, j, k)));
+				T b_r = (jc_on_derivative(i, j, k)*levelset.normal(i, j, k).x*abs(levelset(i + 1, j, k)) + jc_on_derivative(i + 1, j, k)*levelset.normal(i + 1, j, k).x*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i + 1, j, k)));
+				
+				if (((levelset(i, j, k) <= 0) && (levelset(i + 1, j, k) <= 0)) || ((levelset(i, j, k) > 0) && (levelset(i + 1, j, k) > 0)))
+				{
+					F_R = 0;
+				}
+				else if ((levelset(i, j, k) <= 0) && (levelset(i + 1, j, k) > 0))
+				{
+					F_R = one_over_dx2*a_r*beta_r + one_over_dx*beta_r*b_r*subcell_r/variable(i + 1, j, k);
+				}
+				else if ((levelset(i, j, k) > 0) && (levelset(i + 1, j, k) <= 0))
+				{
+					F_R = -one_over_dx2*a_r*beta_r - one_over_dx*beta_r*b_r*subcell_r/variable(i + 1, j, k);
+				}
+	
+				// Bottom arm Stencil
+				T subcell_b = abs(levelset(i, j - 1, k))/(abs(levelset(i, j, k)) + abs(levelset(i, j - 1, k)));
+				T a_b = (jc_on_solution(i, j, k)*abs(levelset(i, j - 1, k)) + jc_on_solution(i, j - 1, k)*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i, j - 1, k)));
+				T b_b = (jc_on_derivative(i, j, k)*levelset.normal(i, j, k).y*abs(levelset(i, j - 1, k)) + jc_on_derivative(i, j - 1, k)*levelset.normal(i, j - 1, k).y*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i, j - 1, k)));
+				
+				if (((levelset(i, j, k) <= 0) && (levelset(i, j - 1, k) <= 0)) || ((levelset(i, j, k) > 0) && (levelset(i, j - 1, k) > 0)))
+				{
+					F_B = 0;
+				}
+				else if ((levelset(i, j, k) <= 0) && (levelset(i, j - 1, k) > 0))
+				{
+					F_B = one_over_dy2*a_b*beta_b - one_over_dy*beta_b*b_b*subcell_b/variable(i, j - 1, k);
+				}
+				else if ((levelset(i, j, k) > 0) && (levelset(i, j - 1, k) <= 0))
+				{
+					F_B = -one_over_dy2*a_b*beta_b + one_over_dy*beta_b*b_b*subcell_b/variable(i, j - 1, k);
+				}
+	
+				// Top arm Stencil
+				T subcell_t = abs(levelset(i, j + 1, k))/(abs(levelset(i, j, k)) + abs(levelset(i, j + 1, k)));
+				T a_t = (jc_on_solution(i, j, k)*abs(levelset(i, j + 1, k)) + jc_on_solution(i, j + 1, k)*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i, j + 1, k)));
+				T b_t = (jc_on_derivative(i, j, k)*levelset.normal(i, j, k).y*abs(levelset(i, j + 1, k)) + jc_on_derivative(i, j + 1, k)*levelset.normal(i, j + 1, k).y*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i, j + 1, k)));
+				
+				if (((levelset(i, j, k) <= 0) && (levelset(i, j + 1, k) <= 0)) || ((levelset(i, j, k) > 0) && (levelset(i, j + 1, k) > 0)))
+				{
+					F_T = 0;
+				}
+				else if ((levelset(i, j, k) <= 0) && (levelset(i, j + 1, k) > 0))
+				{
+					F_T = one_over_dy2*a_t*beta_t + one_over_dy*beta_t*b_t*subcell_t/variable(i, j + 1, k);
+				}
+				else if ((levelset(i, j, k) > 0) && (levelset(i, j + 1, k) <= 0))
+				{
+					F_T = -one_over_dy2*a_t*beta_t - one_over_dy*beta_t*b_t*subcell_t/variable(i, j + 1, k);
+				}
+				
+				// Downward arm Stencil
+				T subcell_d = abs(levelset(i, j, k - 1))/(abs(levelset(i, j, k)) + abs(levelset(i, j, k - 1)));
+				T a_d = (jc_on_solution(i, j, k)*abs(levelset(i, j, k - 1)) + jc_on_solution(i, j, k - 1)*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i, j, k - 1)));
+				T b_d = (jc_on_derivative(i, j, k)*levelset.normal(i, j, k).z*abs(levelset(i, j, k - 1)) + jc_on_derivative(i, j, k - 1)*levelset.normal(i, j, k - 1).z*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i, j, k - 1)));
+	
+				if (((levelset(i, j, k) <= 0) && (levelset(i, j, k - 1) <= 0)) || ((levelset(i, j, k) > 0) && (levelset(i, j, k - 1) > 0)))
+				{
+					F_D = 0;
+				}
+				else if ((levelset(i, j, k) <= 0) && (levelset(i, j, k - 1) > 0))
+				{
+					F_D = one_over_dz2*a_d*beta_d - one_over_dz*beta_d*b_d*subcell_d/variable(i, j, k - 1);
+				}
+				else if ((levelset(i, j, k) > 0) && (levelset(i, j, k - 1) <= 0))
+				{
+					F_D = -one_over_dz2*a_d*beta_d + one_over_dz*beta_d*b_d*subcell_d/variable(i, j, k - 1);
+				}
+	
+				// Upward arm Stencil
+				T subcell_u = abs(levelset(i, j, k + 1))/(abs(levelset(i, j, k)) + abs(levelset(i, j, k + 1)));
+				T a_u = (jc_on_solution(i, j, k)*abs(levelset(i, j, k + 1)) + jc_on_solution(i, j, k + 1)*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i, j, k + 1)));
+				T b_u = (jc_on_derivative(i, j, k)*levelset.normal(i, j, k).z*abs(levelset(i, j, k + 1)) + jc_on_derivative(i, j, k + 1)*levelset.normal(i, j, k + 1).z*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i, j, k + 1)));
+				
+				if (((levelset(i, j, k) <= 0) && (levelset(i, j, k + 1) <= 0)) || ((levelset(i, j, k) > 0) && (levelset(i, j, k + 1) > 0)))
+				{
+					F_U = 0;
+				}
+				else if ((levelset(i, j, k) <= 0) && (levelset(i, j, k + 1) > 0))
+				{
+					F_U = one_over_dz2*a_u*beta_u + one_over_dz*beta_u*b_u*subcell_u/variable(i, j, k + 1);
+				}
+				else if ((levelset(i, j, k) > 0) && (levelset(i, j, k + 1) <= 0))
+				{
+					F_U = -one_over_dz2*a_u*beta_u - one_over_dz*beta_u*b_u*subcell_u/variable(i, j, k + 1);
+				}
+	
+				T F_X = F_L + F_R, F_Y = F_B + F_T, F_Z = F_D + F_U;
+	
+				b_vector[bc(i, j, k)] = -div(i, j, k) - F_X - F_Y - F_Z;
+				
+				if (bc(i - 1, j, k) == BC_DIR)
+				{
+					b_vector[bc(i, j, k)] += beta_l*inv_dxdx*pressure(i - 1, j, k);
+				}
+				if (bc(i + 1, j, k) == BC_DIR)
+				{
+					b_vector[bc(i, j, k)] += beta_r*inv_dxdx*pressure(i + 1, j, k);
+				}
+				if (bc(i, j - 1, k) == BC_DIR)
+				{
+					b_vector[bc(i, j, k)] += beta_b*inv_dydy*pressure(i, j - 1, k);
+				}
+				if (bc(i, j + 1, k) == BC_DIR)
+				{
+					b_vector[bc(i, j, k)] += beta_t*inv_dydy*pressure(i, j + 1, k);
+				}
+				if (bc(i, j, k - 1) == BC_DIR)
+				{
+					b_vector[bc(i, j, k)] += beta_d*inv_dzdz*pressure(i, j, k - 1);
+				}		
+				if (bc(i, j, k + 1) == BC_DIR)
+				{
+					b_vector[bc(i, j, k)] += beta_u*inv_dzdz*pressure(i, j, k + 1);
+				}		
+	
+				x_vector[bc(i, j, k)] = pressure(i, j, k);
+			}
+			END_GRID_ITERATION_3D;
+		}
+
+		if (oil_water_simulation)
+		{
+			BEGIN_GRID_ITERATION_3D(pressure.partial_grids[thread_id])
+			{
+				if (bc(i, j, k) < 0)
+				{
+					continue;
+				}
+
+				T coef_ijk = 0;					// For optimization, inv_dxdx is multiplied at the end
+				
+				// Define betas
+				T beta_l, beta_r, beta_b, beta_t, beta_d, beta_u;
+				T levelset_c = levelset(i, j, k), levelset_l = levelset(i - 1, j, k), levelset_r = levelset(i + 1, j, k), levelset_b = levelset(i, j - 1, k), levelset_t = levelset(i, j + 1, k), levelset_d = levelset(i, j, k - 1), levelset_u = levelset(i, j, k + 1);
+	
+				beta_l = variable(i, j, k)*variable(i - 1, j, k)*(abs(levelset_l) + abs(levelset_c))/(variable(i, j, k)*abs(levelset_l) + variable(i - 1, j, k)*abs(levelset_c));
+				beta_r = variable(i, j, k)*variable(i + 1, j, k)*(abs(levelset_r) + abs(levelset_c))/(variable(i + 1, j, k)*abs(levelset_c) + variable(i, j, k)*abs(levelset_r));
+				beta_b = variable(i, j, k)*variable(i, j - 1, k)*(abs(levelset_b) + abs(levelset_c))/(variable(i, j, k)*abs(levelset_b) + variable(i, j - 1, k)*abs(levelset_c));
+				beta_t = variable(i, j, k)*variable(i, j + 1, k)*(abs(levelset_t) + abs(levelset_c))/(variable(i, j + 1, k)*abs(levelset_c) + variable(i, j, k)*abs(levelset_t));
+				beta_d = variable(i, j, k)*variable(i, j, k - 1)*(abs(levelset_d) + abs(levelset_c))/(variable(i, j, k)*abs(levelset_d) + variable(i, j, k - 1)*abs(levelset_c));
+				beta_u = variable(i, j, k)*variable(i, j, k + 1)*(abs(levelset_u) + abs(levelset_c))/(variable(i, j, k + 1)*abs(levelset_c) + variable(i, j, k)*abs(levelset_u));
+
+				// Divide given region into different region - Boundary Capturing method for Poisson Equation on irregular domain
+				T F_L, F_R, F_B ,F_T, F_D, F_U;
+					
+				// Left arm Stencil
+				T subcell_l = abs(levelset(i - 1, j, k))/(abs(levelset(i, j, k)) + abs(levelset(i - 1, j, k)));
+				T a_l = (jc_on_solution(i, j, k)*abs(levelset(i - 1, j, k)) + jc_on_solution(i - 1, j, k)*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i - 1, j, k)));
+				T b_l = (jc_on_derivative(i, j, k)*levelset.normal(i, j, k).x*abs(levelset(i - 1, j, k)) + jc_on_derivative(i - 1, j, k)*levelset.normal(i - 1, j, k).x*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i - 1, j, k)));
+				
+				if (((levelset(i, j, k) <= 0) && (levelset(i - 1, j, k) <= 0)) || ((levelset(i, j, k) > 0) && (levelset(i - 1, j, k) > 0)))
+				{
+					F_L = 0;
+				}
+				else if ((levelset(i, j, k) <= 0) && (levelset(i - 1, j, k) > 0))
+				{
+					F_L = one_over_dx2*a_l*beta_l - one_over_dx*beta_l*b_l*subcell_l/variable(i - 1, j, k);
+				}
+				else if ((levelset(i, j, k) > 0) && (levelset(i - 1, j, k) <= 0))
+				{
+					F_L = -one_over_dx2*a_l*beta_l + one_over_dx*beta_l*b_l*subcell_l/variable(i - 1, j, k);
+				}
+	
+				// Right arm Stencil
+				T subcell_r = abs(levelset(i + 1, j, k))/(abs(levelset(i, j, k)) + abs(levelset(i + 1, j, k)));
+				T a_r = (jc_on_solution(i, j, k)*abs(levelset(i + 1, j, k)) + jc_on_solution(i + 1, j, k)*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i + 1, j, k)));
+				T b_r = (jc_on_derivative(i, j, k)*levelset.normal(i, j, k).x*abs(levelset(i + 1, j, k)) + jc_on_derivative(i + 1, j, k)*levelset.normal(i + 1, j, k).x*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i + 1, j, k)));
+				
+				if (((levelset(i, j, k) <= 0) && (levelset(i + 1, j, k) <= 0)) || ((levelset(i, j, k) > 0) && (levelset(i + 1, j, k) > 0)))
+				{
+					F_R = 0;
+				}
+				else if ((levelset(i, j, k) <= 0) && (levelset(i + 1, j, k) > 0))
+				{
+					F_R = one_over_dx2*a_r*beta_r + one_over_dx*beta_r*b_r*subcell_r/variable(i + 1, j, k);
+				}
+				else if ((levelset(i, j, k) > 0) && (levelset(i + 1, j, k) <= 0))
+				{
+					F_R = -one_over_dx2*a_r*beta_r - one_over_dx*beta_r*b_r*subcell_r/variable(i + 1, j, k);
+				}
+	
+				// Bottom arm Stencil
+				T subcell_b = abs(levelset(i, j - 1, k))/(abs(levelset(i, j, k)) + abs(levelset(i, j - 1, k)));
+				T a_b = (jc_on_solution(i, j, k)*abs(levelset(i, j - 1, k)) + jc_on_solution(i, j - 1, k)*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i, j - 1, k)));
+				T b_b = (jc_on_derivative(i, j, k)*levelset.normal(i, j, k).y*abs(levelset(i, j - 1, k)) + jc_on_derivative(i, j - 1, k)*levelset.normal(i, j - 1, k).y*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i, j - 1, k)));
+				
+				if (((levelset(i, j, k) <= 0) && (levelset(i, j - 1, k) <= 0)) || ((levelset(i, j, k) > 0) && (levelset(i, j - 1, k) > 0)))
+				{
+					F_B = 0;
+				}
+				else if ((levelset(i, j, k) <= 0) && (levelset(i, j - 1, k) > 0))
+				{
+					F_B = one_over_dy2*a_b*beta_b - one_over_dy*beta_b*b_b*subcell_b/variable(i, j - 1, k);
+				}
+				else if ((levelset(i, j, k) > 0) && (levelset(i, j - 1, k) <= 0))
+				{
+					F_B = -one_over_dy2*a_b*beta_b + one_over_dy*beta_b*b_b*subcell_b/variable(i, j - 1, k);
+				}
+	
+				// Top arm Stencil
+				T subcell_t = abs(levelset(i, j + 1, k))/(abs(levelset(i, j, k)) + abs(levelset(i, j + 1, k)));
+				T a_t = (jc_on_solution(i, j, k)*abs(levelset(i, j + 1, k)) + jc_on_solution(i, j + 1, k)*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i, j + 1, k)));
+				T b_t = (jc_on_derivative(i, j, k)*levelset.normal(i, j, k).y*abs(levelset(i, j + 1, k)) + jc_on_derivative(i, j + 1, k)*levelset.normal(i, j + 1, k).y*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i, j + 1, k)));
+				
+				if (((levelset(i, j, k) <= 0) && (levelset(i, j + 1, k) <= 0)) || ((levelset(i, j, k) > 0) && (levelset(i, j + 1, k) > 0)))
+				{
+					F_T = 0;
+				}
+				else if ((levelset(i, j, k) <= 0) && (levelset(i, j + 1, k) > 0))
+				{
+					F_T = one_over_dy2*a_t*beta_t + one_over_dy*beta_t*b_t*subcell_t/variable(i, j + 1, k);
+				}
+				else if ((levelset(i, j, k) > 0) && (levelset(i, j + 1, k) <= 0))
+				{
+					F_T = -one_over_dy2*a_t*beta_t - one_over_dy*beta_t*b_t*subcell_t/variable(i, j + 1, k);
+				}
+				
+				// Downward arm Stencil
+				T subcell_d = abs(levelset(i, j, k - 1))/(abs(levelset(i, j, k)) + abs(levelset(i, j, k - 1)));
+				T a_d = (jc_on_solution(i, j, k)*abs(levelset(i, j, k - 1)) + jc_on_solution(i, j, k - 1)*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i, j, k - 1)));
+				T b_d = (jc_on_derivative(i, j, k)*levelset.normal(i, j, k).z*abs(levelset(i, j, k - 1)) + jc_on_derivative(i, j, k - 1)*levelset.normal(i, j, k - 1).z*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i, j, k - 1)));
+	
+				if (((levelset(i, j, k) <= 0) && (levelset(i, j, k - 1) <= 0)) || ((levelset(i, j, k) > 0) && (levelset(i, j, k - 1) > 0)))
+				{
+					F_D = 0;
+				}
+				else if ((levelset(i, j, k) <= 0) && (levelset(i, j, k - 1) > 0))
+				{
+					F_D = one_over_dz2*a_d*beta_d - one_over_dz*beta_d*b_d*subcell_d/variable(i, j, k - 1);
+				}
+				else if ((levelset(i, j, k) > 0) && (levelset(i, j, k - 1) <= 0))
+				{
+					F_D = -one_over_dz2*a_d*beta_d + one_over_dz*beta_d*b_d*subcell_d/variable(i, j, k - 1);
+				}
+	
+				// Upward arm Stencil
+				T subcell_u = abs(levelset(i, j, k + 1))/(abs(levelset(i, j, k)) + abs(levelset(i, j, k + 1)));
+				T a_u = (jc_on_solution(i, j, k)*abs(levelset(i, j, k + 1)) + jc_on_solution(i, j, k + 1)*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i, j, k + 1)));
+				T b_u = (jc_on_derivative(i, j, k)*levelset.normal(i, j, k).z*abs(levelset(i, j, k + 1)) + jc_on_derivative(i, j, k + 1)*levelset.normal(i, j, k + 1).z*abs(levelset(i, j, k)))/(abs(levelset(i, j, k)) + abs(levelset(i, j, k + 1)));
+				
+				if (((levelset(i, j, k) <= 0) && (levelset(i, j, k + 1) <= 0)) || ((levelset(i, j, k) > 0) && (levelset(i, j, k + 1) > 0)))
+				{
+					F_U = 0;
+				}
+				else if ((levelset(i, j, k) <= 0) && (levelset(i, j, k + 1) > 0))
+				{
+					F_U = one_over_dz2*a_u*beta_u + one_over_dz*beta_u*b_u*subcell_u/variable(i, j, k + 1);
+				}
+				else if ((levelset(i, j, k) > 0) && (levelset(i, j, k + 1) <= 0))
+				{
+					F_U = -one_over_dz2*a_u*beta_u - one_over_dz*beta_u*b_u*subcell_u/variable(i, j, k + 1);
+				}
+	
+				T F_X = F_L + F_R, F_Y = F_B + F_T, F_Z = F_D + F_U;
+
+				// If full cell's neighbor is full cell
+				if (boundary_levelset.IsFullCell(i, j, k))
+				{
+					if (bc(i - 1, j, k) > -1)
+					{
+						coef_ijk += beta_l;
+						A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -beta_l*inv_dxdx);
+					}
+					if (bc(i + 1, j, k) > -1)
+					{
+						coef_ijk += beta_r;
+						A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -beta_r*inv_dxdx);
+					}
+					if (bc(i, j - 1, k) > -1)
+					{
+						coef_ijk += beta_b;
+						A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -beta_b*inv_dydy);
+					}
+					if (bc(i, j + 1, k) > -1)
+					{
+						coef_ijk += beta_t;
+						A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -beta_t*inv_dydy);
+						
+					}
+					if (bc(i, j, k - 1) > -1)
+					{
+						coef_ijk += beta_d;
+						A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -beta_d*inv_dzdz);
+					}
+					if (bc(i, j, k + 1) > -1)
+					{
+						coef_ijk += beta_u;
+						A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -beta_u*inv_dzdz);
+					}
+
+					b_vector[bc(i, j, k)] = -div(i, j, k);				
+				}
+				else
+				{	
+					T x_min = boundary_levelset.grid.x_min, y_min = boundary_levelset.grid.y_min, z_min = boundary_levelset.grid.z_min;
+					T dx = boundary_levelset.grid.dx, dy = boundary_levelset.grid.dy, dz = boundary_levelset.grid.dz;
+						
+					T p1 = boundary_levelset(VT(x_min + (i - (T)0.5)*dx, y_min + (j - (T)0.5)*dy, z_min + (k + (T)0.5)*dz));
+					T p2 = boundary_levelset(VT(x_min + (i + (T)0.5)*dx, y_min + (j - (T)0.5)*dy, z_min + (k + (T)0.5)*dz));
+					T p3 = boundary_levelset(VT(x_min + (i + (T)0.5)*dx, y_min + (j - (T)0.5)*dy, z_min + (k - (T)0.5)*dz));
+					T p4 = boundary_levelset(VT(x_min + (i - (T)0.5)*dx, y_min + (j - (T)0.5)*dy, z_min + (k - (T)0.5)*dz));
+					T p5 = boundary_levelset(VT(x_min + (i - (T)0.5)*dx, y_min + (j + (T)0.5)*dy, z_min + (k + (T)0.5)*dz));
+					T p6 = boundary_levelset(VT(x_min + (i + (T)0.5)*dx, y_min + (j + (T)0.5)*dy, z_min + (k + (T)0.5)*dz));
+					T p7 = boundary_levelset(VT(x_min + (i + (T)0.5)*dx, y_min + (j + (T)0.5)*dy, z_min + (k - (T)0.5)*dz));
+					T p8 = boundary_levelset(VT(x_min + (i - (T)0.5)*dx, y_min + (j + (T)0.5)*dy, z_min + (k - (T)0.5)*dz));
+					
+					// Note that cylinder is parellel to grid.
+					// Case 1 - p1 < 0 , p5 < 0, others > 0
+					if (p1 < 0 && p2 > 0 && p3 > 0 && p4 > 0 && p5 < 0 && p6 > 0 && p7 > 0 && p8 > 0)
+					{							
+						T l1 = abs(p5)/(abs(p5) + abs(p8))*dz, l2 = abs(p5)/(abs(p5) + abs(p6))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							T coef_l = beta_l*l1*one_over_dy;
+							coef_ijk += coef_l;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dydy);
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							coef_ijk += 0;
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							T one_over_2dz2 = (T)0.5/(dz*dz);
+							T coef_b = beta_b*l1*l2*one_over_2dz2;
+							coef_ijk += coef_b;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -coef_b*inv_dydy);
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							T one_over_2dz2 = (T)0.5/(dz*dz);
+							T coef_t = beta_t*l1*l2*one_over_2dz2;
+							coef_ijk += coef_t;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -coef_t*inv_dydy);
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							coef_ijk += 0;
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							T coef_u = beta_u*l2*one_over_dy;
+							coef_ijk += coef_u;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -coef_u*inv_dydy);
+						}
+
+						b_vector[bc(i, j, k)] = -(T)0.5*l1*l2*one_over_dx*one_over_dz*div(i, j, k);
+					}
+
+					// Case 2 - p2 < 0 , p6 < 0, others > 0
+					if (p1 > 0 && p2 < 0 && p3 > 0 && p4 > 0 && p5 > 0 && p6 < 0 && p7 > 0 && p8 > 0)
+					{							
+						T l1 = abs(p6)/(abs(p6) + abs(p7))*dz, l2 = abs(p6)/(abs(p5) + abs(p6))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							coef_ijk += 0;
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							T coef_r = beta_r*l1*one_over_dy;
+							coef_ijk += coef_r;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -coef_r*inv_dydy);
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							T one_over_2dz2 = (T)0.5/(dz*dz);
+							T coef_b = beta_b*l1*l2*one_over_2dz2;
+							coef_ijk += coef_b;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -coef_b*inv_dydy);
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							T one_over_2dz2 = (T)0.5/(dz*dz);
+							T coef_t = beta_t*l1*l2*one_over_2dz2;
+							coef_ijk += coef_t;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -coef_t*inv_dydy);
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							coef_ijk += 0;
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							T coef_u = beta_u*l2*one_over_dy;
+							coef_ijk += coef_u;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -coef_u*inv_dydy);
+						}
+
+						b_vector[bc(i, j, k)] = -(T)0.5*l1*l2*one_over_dx*one_over_dz*div(i, j, k);
+					}
+
+					// Case 3 - p3 < 0 , p7 < 0, others > 0
+					if (p1 > 0 && p2 > 0 && p3 < 0 && p4 > 0 && p5 > 0 && p6 > 0 && p7 < 0 && p8 > 0)
+					{							
+						T l1 = abs(p7)/(abs(p6) + abs(p7))*dz, l2 = abs(p7)/(abs(p7) + abs(p8))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							coef_ijk += 0;
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							T coef_r = beta_r*l1*one_over_dy;
+							coef_ijk += coef_r;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -coef_r*inv_dydy);
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							T one_over_2dz2 = (T)0.5/(dz*dz);
+							T coef_b = beta_b*l1*l2*one_over_2dz2;
+							coef_ijk += coef_b;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -coef_b*inv_dydy);
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							T one_over_2dz2 = (T)0.5/(dz*dz);
+							T coef_t = beta_t*l1*l2*one_over_2dz2;
+							coef_ijk += coef_t;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -coef_t*inv_dydy);
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							T coef_d = beta_d*l2*one_over_dy;
+							coef_ijk += coef_d;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -coef_d*inv_dydy);
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							coef_ijk += 0;
+						}
+
+						b_vector[bc(i, j, k)] = -(T)0.5*l1*l2*one_over_dx*one_over_dz*div(i, j, k);
+					}
+
+					// Case 4 - p4 < 0 , p8 < 0, others > 0
+					if (p1 > 0 && p2 > 0 && p3 > 0 && p4 < 0 && p5 > 0 && p6 > 0 && p7 > 0 && p8 < 0)
+					{							
+						T l1 = abs(p8)/(abs(p5) + abs(p8))*dz, l2 = abs(p8)/(abs(p7) + abs(p8))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							T coef_l = beta_l*l1*one_over_dy;
+							coef_ijk += coef_l;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dydy);
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							coef_ijk += 0;
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							T one_over_2dz2 = (T)0.5/(dz*dz);
+							T coef_b = beta_b*l1*l2*one_over_2dz2;
+							coef_ijk += coef_b;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -coef_b*inv_dydy);
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							T one_over_2dz2 = (T)0.5/(dz*dz);
+							T coef_t = beta_t*l1*l2*one_over_2dz2;
+							coef_ijk += coef_t;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -coef_t*inv_dydy);
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							T coef_d = beta_d*l2*one_over_dy;
+							coef_ijk += coef_d;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -coef_d*inv_dydy);
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							coef_ijk += 0;
+						}
+
+						b_vector[bc(i, j, k)] = -(T)0.5*l1*l2*one_over_dx*one_over_dz*div(i, j, k);
+					}
+
+					// Case 5 - p5 < 0 , p6 < 0, others > 0
+					if (p1 > 0 && p2 > 0 && p3 > 0 && p4 > 0 && p5 < 0 && p6 < 0 && p7 > 0 && p8 > 0)
+					{							
+						T l1 = abs(p5)/(abs(p5) + abs(p8))*dz, l2 = abs(p5)/(abs(p1) + abs(p5))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							T one_over_2dz2 = (T)0.5/(dz*dz);
+							T coef_l = beta_l*l1*l2*one_over_2dz2;
+							coef_ijk += coef_l;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dydy);
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							T one_over_2dz2 = (T)0.5/(dz*dz);
+							T coef_r = beta_r*l1*l2*one_over_2dz2;
+							coef_ijk += coef_r;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -coef_r*inv_dydy);
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							coef_ijk += 0;
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							T coef_t = beta_t*l1*one_over_dy;
+							coef_ijk += coef_t;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -coef_t*inv_dydy);
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							coef_ijk += 0;
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							T coef_u = beta_u*l2*one_over_dy;
+							coef_ijk += coef_u;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -coef_u*inv_dydy);
+						}
+
+						b_vector[bc(i, j, k)] = -(T)0.5*l1*l2*one_over_dx*one_over_dz*div(i, j, k);
+					}
+
+					// Case 6 - p1 < 0 , p2 < 0, others > 0
+					if (p1 < 0 && p2 < 0 && p3 > 0 && p4 > 0 && p5 > 0 && p6 > 0 && p7 > 0 && p8 > 0)
+					{							
+						T l1 = abs(p1)/(abs(p1) + abs(p4))*dz, l2 = abs(p1)/(abs(p1) + abs(p5))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							T one_over_2dz2 = (T)0.5/(dz*dz);
+							T coef_l = beta_l*l1*l2*one_over_2dz2;
+							coef_ijk += coef_l;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dydy);
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							T one_over_2dz2 = (T)0.5/(dz*dz);
+							T coef_r = beta_r*l1*l2*one_over_2dz2;
+							coef_ijk += coef_r;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -coef_r*inv_dydy);
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							T coef_b = beta_b*l1*one_over_dy;
+							coef_ijk += coef_b;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -coef_b*inv_dydy);
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							coef_ijk += 0;
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							coef_ijk += 0;
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							T coef_u = beta_u*l2*one_over_dy;
+							coef_ijk += coef_u;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -coef_u*inv_dydy);
+						}
+
+						b_vector[bc(i, j, k)] = -(T)0.5*l1*l2*one_over_dx*one_over_dz*div(i, j, k);
+					}
+
+					// Case 7 - p3 < 0 , p4 < 0, others > 0
+					if (p1 > 0 && p2 > 0 && p3 < 0 && p4 < 0 && p5 > 0 && p6 > 0 && p7 > 0 && p8 > 0)
+					{							
+						T l1 = abs(p3)/(abs(p2) + abs(p3))*dz, l2 = abs(p3)/(abs(p3) + abs(p7))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							T one_over_2dz2 = (T)0.5/(dz*dz);
+							T coef_l = beta_l*l1*l2*one_over_2dz2;
+							coef_ijk += coef_l;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dydy);
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							T one_over_2dz2 = (T)0.5/(dz*dz);
+							T coef_r = beta_r*l1*l2*one_over_2dz2;
+							coef_ijk += coef_r;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_r*inv_dydy);
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							T coef_b = beta_b*l1*one_over_dy;
+							coef_ijk += coef_b;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -coef_b*inv_dydy);
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							coef_ijk += 0;
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							T coef_d = beta_d*l2*one_over_dy;
+							coef_ijk += coef_d;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -coef_d*inv_dydy);
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							coef_ijk += 0;
+						}
+
+						b_vector[bc(i, j, k)] = -(T)0.5*l1*l2*one_over_dx*one_over_dz*div(i, j, k);
+					}
+
+					// Case 8 - p7 < 0 , p8 < 0, others > 0
+					if (p1 > 0 && p2 > 0 && p3 > 0 && p4 > 0 && p5 > 0 && p6 > 0 && p7 < 0 && p8 < 0)
+					{							
+						T l1 = abs(p3)/(abs(p2) + abs(p3))*dz, l2 = abs(p3)/(abs(p3) + abs(p7))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							T one_over_2dz2 = (T)0.5/(dz*dz);
+							T coef_l = beta_l*l1*l2*one_over_2dz2;
+							coef_ijk += coef_l;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dydy);
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							T one_over_2dz2 = (T)0.5/(dz*dz);
+							T coef_r = beta_r*l1*l2*one_over_2dz2;
+							coef_ijk += coef_r;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -coef_r*inv_dydy);
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							coef_ijk += 0;
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							T coef_t = beta_t*l1*one_over_dy;
+							coef_ijk += coef_t;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -coef_t*inv_dydy);
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							T coef_d = beta_d*l2*one_over_dy;
+							coef_ijk += coef_d;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -coef_d*inv_dydy);
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							coef_ijk += 0;
+						}
+
+						b_vector[bc(i, j, k)] = -(T)0.5*l1*l2*one_over_dx*one_over_dz*div(i, j, k);
+					}
+
+					// Case 9 - p1 < 0, p4 < 0, p5 < 0, p8 < 0, other > 0
+					if (p1 < 0 && p2 > 0 && p3 > 0 && p4 < 0 && p5 < 0 && p6 > 0 && p7 > 0 && p8 < 0)
+					{							
+						T l1 = abs(p5)/(abs(p5) + abs(p6))*dx, l2 = abs(p8)/(abs(p7) + abs(p8))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							coef_ijk += beta_l;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -beta_l*inv_dxdx);
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							coef_ijk += 0;
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							T one_over_2dz = (T)0.5/dz;
+							T coef_b = beta_b*(l1 + l2)*one_over_2dz;
+							coef_ijk += coef_b;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -coef_b*inv_dydy);
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							T one_over_2dz = (T)0.5/dz;
+							T coef_t = beta_t*(l1 + l2)*one_over_2dz;
+							coef_ijk += coef_t;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -coef_t*inv_dydy);
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							T one_over_2dy = (T)0.5/dy;
+							T coef_d = beta_d*(l2 + l2)*one_over_2dy;
+							coef_ijk += coef_d;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -coef_d*inv_dydy);
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							T one_over_2dy = (T)0.5/dy;
+							T coef_u = beta_u*(l1 + l1)*one_over_2dy;
+							coef_ijk += coef_u;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -coef_u*inv_dydy);
+						}
+
+						b_vector[bc(i, j, k)] = -(T)0.5*(l1 + l2)*one_over_dx*div(i, j, k);
+					}
+
+					// Case 10 - p3 < 0, p4 < 0, p7 < 0, p8 < 0, other > 0
+					if (p1 > 0 && p2 > 0 && p3 < 0 && p4 < 0 && p5 > 0 && p6 > 0 && p7 < 0 && p8 < 0)
+					{							
+						T l1 = abs(p8)/(abs(p5) + abs(p8))*dx, l2 = abs(p7)/(abs(p6) + abs(p7))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							T coef_l = beta_l*l1*one_over_dx;
+							coef_ijk += coef_l;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dxdx);
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							T coef_r = beta_r*l2*one_over_dx;
+							coef_ijk += coef_r;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -coef_r*inv_dxdx);
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							T one_over_2dz = (T)0.5/dz;
+							T coef_b = beta_b*(l1 + l2)*one_over_2dz;
+							coef_ijk += coef_b;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -coef_b*inv_dydy);
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							T one_over_2dz = (T)0.5/dz;
+							T coef_t = beta_t*(l1 + l2)*one_over_2dz;
+							coef_ijk += coef_t;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -coef_t*inv_dydy);
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							coef_ijk += beta_d;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -beta_d*inv_dydy);
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							coef_ijk += 0;
+						}
+
+						b_vector[bc(i, j, k)] = -(T)0.5*(l1 + l2)*one_over_dx*div(i, j, k);
+					}
+
+					// Case 11 - p2 < 0, p3 < 0, p6 < 0, p7 < 0, other > 0
+					if (p1 > 0 && p2 < 0 && p3 < 0 && p4 > 0 && p5 > 0 && p6 < 0 && p7 < 0 && p8 > 0)
+					{							
+						T l1 = abs(p6)/(abs(p5) + abs(p6))*dx, l2 = abs(p7)/(abs(p7) + abs(p8))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							coef_ijk += 0;
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							coef_ijk += beta_r;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -beta_r*inv_dxdx);
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							T one_over_2dz = (T)0.5/dz;
+							T coef_b = beta_b*(l1 + l2)*one_over_2dz;
+							coef_ijk += coef_b;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -coef_b*inv_dydy);
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							T one_over_2dz = (T)0.5/dz;
+							T coef_t = beta_t*(l1 + l2)*one_over_2dz;
+							coef_ijk += coef_t;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -coef_t*inv_dydy);
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							T one_over_2dy = (T)0.5/dy;
+							T coef_d = beta_d*(l2 + l2)*one_over_2dy;
+							coef_ijk += coef_d;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -coef_d*inv_dydy);
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							T one_over_2dy = (T)0.5/dy;
+							T coef_u = beta_u*(l1 + l1)*one_over_2dy;
+							coef_ijk += coef_u;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -coef_u*inv_dydy);
+						}
+
+						b_vector[bc(i, j, k)] = -(T)0.5*(l1 + l2)*one_over_dx*div(i, j, k);
+					}
+					
+					// Case 12 - p1 < 0, p2 < 0, p5 < 0, p6 < 0, other > 0
+					if (p1 < 0 && p2 < 0 && p3 > 0 && p4 > 0 && p5 < 0 && p6 < 0 && p7 > 0 && p8 > 0)
+					{							
+						T l1 = abs(p5)/(abs(p5) + abs(p8))*dx, l2 = abs(p6)/(abs(p6) + abs(p7))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							T coef_l = beta_l*l1*one_over_dx;
+							coef_ijk += coef_l;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dxdx);
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							T coef_r = beta_r*l2*one_over_dx;
+							coef_ijk += coef_r;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -coef_r*inv_dxdx);
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							T one_over_2dz = (T)0.5/dz;
+							T coef_b = beta_b*(l1 + l2)*one_over_2dz;
+							coef_ijk += coef_b;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -coef_b*inv_dydy);
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							T one_over_2dz = (T)0.5/dz;
+							T coef_t = beta_t*(l1 + l2)*one_over_2dz;
+							coef_ijk += coef_t;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -coef_t*inv_dydy);
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							coef_ijk += 0;
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							coef_ijk += beta_u;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -beta_u*inv_dydy);
+						}
+
+						b_vector[bc(i, j, k)] = -(T)0.5*(l1 + l2)*one_over_dx*div(i, j, k);
+					}
+					// Case 13 - p5 < 0, p6 < 0, p7 < 0, p8 < 0, other > 0
+					if (p1 > 0 && p2 > 0 && p3 > 0 && p4 > 0 && p5 < 0 && p6 < 0 && p7 < 0 && p8 < 0)
+					{							
+						T l1 = abs(p5)/(abs(p1) + abs(p5))*dx, l2 = abs(p8)/(abs(p4) + abs(p8))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							T one_over_2dz = (T)0.5/dz;
+							T coef_l = beta_l*(l1 + l2)*one_over_2dz;
+							coef_ijk += coef_l;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dydy);
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							T one_over_2dz = (T)0.5/dz;
+							T coef_r = beta_r*(l1 + l2)*one_over_2dz;
+							coef_ijk += coef_r;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -coef_r*inv_dydy);
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							coef_ijk += 0;
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							coef_ijk += beta_t;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -beta_t*inv_dydy);
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							T one_over_2dy = (T)0.5/dy;
+							T coef_d = beta_d*(l2 + l2)*one_over_2dy;
+							coef_ijk += coef_d;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -coef_d*inv_dydy);
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							T one_over_2dy = (T)0.5/dy;
+							T coef_u = beta_u*(l1 + l1)*one_over_2dy;
+							coef_ijk += coef_u;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -coef_u*inv_dydy);
+						}
+
+						b_vector[bc(i, j, k)] = -(T)0.5*(l1 + l2)*one_over_dx*div(i, j, k);
+					}
+					// Case 14 - p1 < 0, p2 < 0, p3 < 0, p4 < 0, other > 0
+					if (p1 < 0 && p2 < 0 && p3 < 0 && p4 < 0 && p5 > 0 && p6 > 0 && p7 > 0 && p8 > 0)
+					{							
+						T l1 = abs(p1)/(abs(p1) + abs(p5))*dx, l2 = abs(p4)/(abs(p4) + abs(p8))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							T one_over_2dz = (T)0.5/dz;
+							T coef_l = beta_l*(l1 + l2)*one_over_2dz;
+							coef_ijk += coef_l;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dydy);
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							T one_over_2dz = (T)0.5/dz;
+							T coef_r = beta_r*(l1 + l2)*one_over_2dz;
+							coef_ijk += coef_r;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -coef_r*inv_dydy);
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							coef_ijk += beta_b;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -beta_b*inv_dydy);
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							coef_ijk += 0;
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							T one_over_2dy = (T)0.5/dy;
+							T coef_d = beta_d*(l2 + l2)*one_over_2dy;
+							coef_ijk += coef_d;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -coef_d*inv_dydy);
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							T one_over_2dy = (T)0.5/dy;
+							T coef_u = beta_u*(l1 + l1)*one_over_2dy;
+							coef_ijk += coef_u;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -coef_u*inv_dydy);
+						}
+
+						b_vector[bc(i, j, k)] = -(T)0.5*(l1 + l2)*one_over_dx*div(i, j, k);
+					}
+					// Case 15 - p3 > 0, p7 > 0, other < 0
+					if (p1 < 0 && p2 < 0 && p3 > 0 && p4 < 0 && p5 < 0 && p6 < 0 && p7 > 0 && p8 < 0)
+					{
+						T l1 = abs(p8)/(abs(p7) + abs(p8))*dx, l2 = abs(p6)/(abs(p6) + abs(p7))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							coef_ijk += beta_l;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -beta_l*inv_dxdx);
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							T coef_r = beta_r*l2*one_over_dy;
+							coef_ijk += coef_r;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -coef_r*inv_dxdx);
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							T one_over_dxdz = (T)1/(dx*dz);
+							T coef_b = (T)0.5*beta_b*(1 + l1*one_over_dx + l2*one_over_dz - l1*l2*one_over_dxdz);
+							coef_ijk += coef_b;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -coef_b*inv_dydy);
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							T one_over_dxdz = (T)1/(dx*dz);
+							T coef_t = (T)0.5*beta_t*(1 + l1*one_over_dx + l2*one_over_dz - l1*l2*one_over_dxdz);
+							coef_ijk += coef_t;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -coef_t*inv_dydy);
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							T coef_d = beta_d*l1*one_over_dy;
+							coef_ijk += coef_d;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -coef_d*inv_dydy);
+							
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							coef_ijk += beta_u;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -beta_u*inv_dydy);
+						}
+
+						b_vector[bc(i, j, k)] = -(T)0.5*(1 + l1*one_over_dx + l2*one_over_dz - l1*l2*one_over_dx*one_over_dz)*div(i, j, k);  
+					}
+					// Case 16 - p4 > 0, p8 > 0, other < 0
+					if (p1 < 0 && p2 < 0 && p3 < 0 && p4 > 0 && p5 < 0 && p6 < 0 && p7 < 0 && p8 > 0)
+					{
+						T l1 = abs(p7)/(abs(p7) + abs(p8))*dx, l2 = abs(p5)/(abs(p5) + abs(p8))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							T coef_l = beta_l*l2*one_over_dy;
+							coef_ijk += coef_l;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dxdx);
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							coef_ijk += beta_r;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -beta_r*inv_dxdx);
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							T one_over_dxdz = (T)1/(dx*dz);
+							T coef_b = (T)0.5*beta_b*(1 + l1*one_over_dx + l2*one_over_dz - l1*l2*one_over_dxdz);
+							coef_ijk += coef_b;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -coef_b*inv_dydy);
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							T one_over_dxdz = (T)1/(dx*dz);
+							T coef_t = (T)0.5*beta_t*(1 + l1*one_over_dx + l2*one_over_dz - l1*l2*one_over_dxdz);
+							coef_ijk += coef_t;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -coef_t*inv_dydy);
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							T coef_d = beta_d*l1*one_over_dy;
+							coef_ijk += coef_d;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -coef_d*inv_dydy);
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							coef_ijk += beta_u;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -beta_u*inv_dydy);
+						}
+
+						b_vector[bc(i, j, k)] = -(T)0.5*(1 + l1*one_over_dx + l2*one_over_dz - l1*l2*one_over_dx*one_over_dz)*div(i, j, k);  
+					}
+					// Case 17 - p1 > 0, p5 > 0, other < 0
+					if (p1 > 0 && p2 < 0 && p3 < 0 && p4 < 0 && p5 > 0 && p6 < 0 && p7 < 0 && p8 < 0)
+					{
+						T l1 = abs(p6)/(abs(p5) + abs(p6))*dx, l2 = abs(p8)/(abs(p5) + abs(p8))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							T coef_l = beta_l*l2*one_over_dy;
+							coef_ijk += coef_l;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dxdx);	
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							coef_ijk += beta_r;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -beta_r*inv_dxdx);
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							T one_over_dxdz = (T)1/(dx*dz);
+							T coef_b = (T)0.5*beta_b*(1 + l1*one_over_dx + l2*one_over_dz - l1*l2*one_over_dxdz);
+							coef_ijk += coef_b;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -coef_b*inv_dydy);
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							T one_over_dxdz = (T)1/(dx*dz);
+							T coef_t = (T)0.5*beta_t*(1 + l1*one_over_dx + l2*one_over_dz - l1*l2*one_over_dxdz);
+							coef_ijk += coef_t;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -coef_t*inv_dydy);
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							coef_ijk += beta_d;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -beta_d*inv_dydy);
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							T coef_u = beta_u*l1*one_over_dy;
+							coef_ijk += coef_u;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -coef_u*inv_dydy);
+						}
+						
+						b_vector[bc(i, j, k)] = -(T)0.5*(1 + l1*one_over_dx + l2*one_over_dz - l1*l2*one_over_dx*one_over_dz)*div(i, j, k);  
+					}
+					// Case 18 - p2 > 0, p6 > 0, other < 0
+					if (p1 < 0 && p2 > 0 && p3 < 0 && p4 < 0 && p5 < 0 && p6 > 0 && p7 < 0 && p8 < 0)
+					{
+						T l1 = abs(p5)/(abs(p5) + abs(p6))*dx, l2 = abs(p7)/(abs(p6) + abs(p7))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							coef_ijk += beta_l;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -beta_l*inv_dxdx);
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							T coef_r = beta_r*l2*one_over_dy;
+							coef_ijk += coef_r;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -coef_r*inv_dxdx);
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							T one_over_dxdz = (T)1/(dx*dz);
+							T coef_b = (T)0.5*beta_b*(1 + l1*one_over_dx + l2*one_over_dz - l1*l2*one_over_dxdz);
+							coef_ijk += coef_b;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -coef_b*inv_dydy);
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							T one_over_dxdz = (T)1/(dx*dz);
+							T coef_t = (T)0.5*beta_t*(1 + l1*one_over_dx + l2*one_over_dz - l1*l2*one_over_dxdz);
+							coef_ijk += coef_t;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -coef_t*inv_dydy);
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							coef_ijk += beta_d;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -beta_d*inv_dydy);
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							T coef_u = beta_u*l1*one_over_dy;
+							coef_ijk += coef_u;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -coef_u*inv_dydy);
+						}
+						
+						b_vector[bc(i, j, k)] = -(T)0.5*(1 + l1*one_over_dx + l2*one_over_dz - l1*l2*one_over_dx*one_over_dz)*div(i, j, k);  
+					}
+					// Case 19 - p5 > 0, p6 > 0, other < 0
+					if (p1 < 0 && p2 < 0 && p3 < 0 && p4 < 0 && p5 > 0 && p6 > 0 && p7 < 0 && p8 < 0)
+					{
+						T l1 = abs(p7)/(abs(p6) + abs(p7))*dx, l2 = abs(p2)/(abs(p2) + abs(p6))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							T one_over_dxdy = (T)1/(dx*dy);
+							T coef_l = (T)0.5*beta_l*(1 + l1*one_over_dx + l2*one_over_dy - l1*l2*one_over_dxdy);
+							coef_ijk += coef_l;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dydy);
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							T one_over_dxdy = (T)1/(dx*dy);
+							T coef_r = (T)0.5*beta_r*(1 + l1*one_over_dx + l2*one_over_dy - l1*l2*one_over_dxdy);
+							coef_ijk += coef_r;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -coef_r*inv_dydy);
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							coef_ijk += beta_b;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -beta_b*inv_dydy);
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							T coef_t = beta_t*l1*one_over_dy;
+							coef_ijk += coef_t;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -coef_t*inv_dydy);
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							coef_ijk += beta_d;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -beta_d*inv_dydy);
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							T coef_u = beta_u*l2*one_over_dy;
+							coef_ijk += coef_u;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -coef_u*inv_dydy);
+						}
+
+						b_vector[bc(i, j, k)] = -(T)0.5*(1 + l1*one_over_dx + l2*one_over_dy - l1*l2*one_over_dx*one_over_dy)*div(i, j, k);  
+					}
+					// Case 20 - p7 > 0, p8 > 0, other < 0
+					if (p1 < 0 && p2 < 0 && p3 < 0 && p4 < 0 && p5 < 0 && p6 < 0 && p7 > 0 && p8 > 0)
+					{
+						T l1 = abs(p5)/(abs(p5) + abs(p8))*dx, l2 = abs(p4)/(abs(p4) + abs(p8))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							T one_over_dxdy = (T)1/(dx*dy);
+							T coef_l = (T)0.5*beta_l*(1 + l1*one_over_dx + l2*one_over_dy - l1*l2*one_over_dxdy);
+							coef_ijk += coef_l;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dydy);
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							T one_over_dxdy = (T)1/(dx*dy);
+							T coef_r = (T)0.5*beta_r*(1 + l1*one_over_dx + l2*one_over_dy - l1*l2*one_over_dxdy);
+							coef_ijk += coef_r;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -coef_r*inv_dydy);
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							coef_ijk += beta_b;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -beta_b*inv_dydy);
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							T coef_t = beta_t*l1*one_over_dy;
+							coef_ijk += coef_t;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -coef_t*inv_dydy);
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							T coef_d = beta_d*l2*one_over_dy;
+							coef_ijk += coef_d;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -coef_d*inv_dydy);
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							coef_ijk += beta_u;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -beta_u*inv_dydy);
+						}
+
+						b_vector[bc(i, j, k)] = -(T)0.5*(1 + l1*one_over_dx + l2*one_over_dy - l1*l2*one_over_dx*one_over_dy)*div(i, j, k);  
+					}
+					// Case 21 - p3 > 0, p4 > 0, other < 0
+					if (p1 < 0 && p2 < 0 && p3 >0 && p4 > 0 && p5 < 0 && p6 < 0 && p7 < 0 && p8 < 0)
+					{
+						T l1 = abs(p8)/(abs(p4) + abs(p8))*dx, l2 = abs(p1)/(abs(p1) + abs(p4))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							T one_over_dxdy = (T)1/(dx*dy);
+							T coef_l = (T)0.5*beta_l*(1 + l1*one_over_dx + l2*one_over_dy - l1*l2*one_over_dxdy);
+							coef_ijk += coef_l;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dydy);
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							T one_over_dxdy = (T)1/(dx*dy);
+							T coef_r = (T)0.5*beta_r*(1 + l1*one_over_dx + l2*one_over_dy - l1*l2*one_over_dxdy);
+							coef_ijk += coef_r;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -coef_r*inv_dydy);
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							T coef_b = beta_b*l2*one_over_dy;
+							coef_ijk += coef_b;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -coef_b*inv_dydy);
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							coef_ijk += beta_t;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -beta_t*inv_dydy);
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							T coef_d = beta_d*l1*one_over_dy;
+							coef_ijk += coef_d;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -coef_d*inv_dydy);
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							coef_ijk += beta_u;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -beta_u*inv_dydy);
+						}
+
+						b_vector[bc(i, j, k)] = -(T)0.5*(1 + l1*one_over_dx + l2*one_over_dy - l1*l2*one_over_dx*one_over_dy)*div(i, j, k);  
+					}
+					// Case 22 - p1 > 0, p2 > 0, other < 0
+					if (p1 > 0 && p2 > 0 && p3 < 0 && p4 < 0 && p5 < 0 && p6 < 0 && p7 < 0 && p8 < 0)
+					{
+						T l1 = abs(p3)/(abs(p2) + abs(p3))*dx, l2 = abs(p6)/(abs(p2) + abs(p6))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							T one_over_dxdy = (T)1/(dx*dy);
+							T coef_l = (T)0.5*beta_l*(1 + l1*one_over_dx + l2*one_over_dy - l1*l2*one_over_dxdy);
+							coef_ijk += coef_l;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dydy);
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							T one_over_dxdy = (T)1/(dx*dy);
+							T coef_r = (T)0.5*beta_r*(1 + l1*one_over_dx + l2*one_over_dy - l1*l2*one_over_dxdy);
+							coef_ijk += coef_r;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -coef_r*inv_dydy);
+						}
+						if (bc(i, j - 1, k) > -1)
+						{
+							T coef_b = beta_b*l1*one_over_dy;
+							coef_ijk += coef_b;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -coef_b*inv_dydy);
+						}
+						if (bc(i, j + 1, k) > -1)
+						{
+							coef_ijk += beta_t;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -beta_t*inv_dydy);
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							coef_ijk += beta_d;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -beta_d*inv_dydy);
+						}
+						if (bc(i, j, k + 1) > -1)
+						{
+							T coef_u = beta_u*l2*one_over_dy;
+							coef_ijk += coef_u;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -coef_u*inv_dydy);
+						}
+
+						b_vector[bc(i, j, k)] = -(T)0.5*(1 + l1*one_over_dx + l2*one_over_dy - l1*l2*one_over_dx*one_over_dy)*div(i, j, k);  
+					}
+				}
+
+				// Periodic Boundary Condition
+				if (bc(i, j - 1, k) == BC_PER)
+				{
+					coef_ijk += beta_b;
+					A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j_end + (j - 1 - j_start), k), -beta_b*inv_dydy);
+				}
+				if (bc(i, j + 1, k) == BC_PER)
+				{
+					coef_ijk += beta_t;
+					A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j_start + (j + 1 - j_end), k), -beta_t*inv_dydy);
+				}
+
+				// For saving starting index of the given domain
+				if (bc(i, j, k) == 0)
+				{
+					i_start_for_domain = i;
+					j_start_for_domain = j;
+					k_start_for_domain = k;
+				}
+							
+				if (coef_ijk == 0)
+				{
+					coef_ijk = 1;
+				}
+				
+				A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k), inv_dxdx*(T)coef_ijk);
 	
 				b_vector[bc(i, j, k)] = -div(i, j, k) - F_X - F_Y - F_Z;
 				

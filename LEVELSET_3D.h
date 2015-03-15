@@ -1252,6 +1252,53 @@ public: // Member Functions
 		END_GRID_ITERATION_3D;
 	}
 
+	bool IsFullCell(const int& i, const int& j, const int& k)
+	{
+		T x_min = grid.x_min, y_min = grid.y_min, z_min = grid.z_min;
+		T dx = grid.dx, dy = grid.dy, dz = grid.dz;
+
+		T p1 = signed_distance_field(VT(x_min + (i - (T)0.5)*dx, y_min + (j - (T)0.5)*dy, z_min + (k + (T)0.5)*dz));
+		T p2 = signed_distance_field(VT(x_min + (i + (T)0.5)*dx, y_min + (j - (T)0.5)*dy, z_min + (k + (T)0.5)*dz));
+		T p3 = signed_distance_field(VT(x_min + (i + (T)0.5)*dx, y_min + (j - (T)0.5)*dy, z_min + (k - (T)0.5)*dz));
+		T p4 = signed_distance_field(VT(x_min + (i - (T)0.5)*dx, y_min + (j - (T)0.5)*dy, z_min + (k - (T)0.5)*dz));
+		T p5 = signed_distance_field(VT(x_min + (i - (T)0.5)*dx, y_min + (j + (T)0.5)*dy, z_min + (k + (T)0.5)*dz));
+		T p6 = signed_distance_field(VT(x_min + (i + (T)0.5)*dx, y_min + (j + (T)0.5)*dy, z_min + (k + (T)0.5)*dz));
+		T p7 = signed_distance_field(VT(x_min + (i + (T)0.5)*dx, y_min + (j + (T)0.5)*dy, z_min + (k - (T)0.5)*dz));
+		T p8 = signed_distance_field(VT(x_min + (i - (T)0.5)*dx, y_min + (j + (T)0.5)*dy, z_min + (k - (T)0.5)*dz));
+		
+		if ((p1 < 0) && (p2 < 0) && (p3 < 0) && (p4 < 0) && (p5 < 0) && (p6 < 0) && (p7 < 0) && (p8 < 0))
+		{
+			return true;			
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+	bool IsCellContained(const int& i, const int& j, const int& k)
+	{
+		T x_min = grid.x_min, y_min = grid.y_min, z_min = grid.z_min;
+		T dx = grid.dx, dy = grid.dy, dz = grid.dz;
+
+		T p1 = signed_distance_field(VT(x_min + (i - (T)0.5)*dx, y_min + (j - (T)0.5)*dy, z_min + (k + (T)0.5)*dz));
+		T p2 = signed_distance_field(VT(x_min + (i + (T)0.5)*dx, y_min + (j - (T)0.5)*dy, z_min + (k + (T)0.5)*dz));
+		T p3 = signed_distance_field(VT(x_min + (i + (T)0.5)*dx, y_min + (j - (T)0.5)*dy, z_min + (k - (T)0.5)*dz));
+		T p4 = signed_distance_field(VT(x_min + (i - (T)0.5)*dx, y_min + (j - (T)0.5)*dy, z_min + (k - (T)0.5)*dz));
+		T p5 = signed_distance_field(VT(x_min + (i - (T)0.5)*dx, y_min + (j + (T)0.5)*dy, z_min + (k + (T)0.5)*dz));
+		T p6 = signed_distance_field(VT(x_min + (i + (T)0.5)*dx, y_min + (j + (T)0.5)*dy, z_min + (k + (T)0.5)*dz));
+		T p7 = signed_distance_field(VT(x_min + (i + (T)0.5)*dx, y_min + (j + (T)0.5)*dy, z_min + (k - (T)0.5)*dz));
+		T p8 = signed_distance_field(VT(x_min + (i - (T)0.5)*dx, y_min + (j + (T)0.5)*dy, z_min + (k - (T)0.5)*dz));
+		
+		if ((p1 < 0) || (p2 < 0) || (p3 < 0) || (p4 < 0) || (p5 < 0) || (p6 < 0) || (p7 < 0) || (p8 < 0))
+		{
+			return true;			
+		}
+		else
+		{
+			return false;
+		}
+	}
 };
 
 void Sampling(MULTITHREADING* multithreading, const int& thread_id, const LEVELSET_3D& from_input, LEVELSET_3D& to_input);

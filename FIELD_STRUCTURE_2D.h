@@ -178,7 +178,7 @@ public: // Member Functions
 		const T b = (posy - (y_min + ((T)0.5 + (T)(j0 - j_start))*dy))*one_over_dy;
 		
 		const int ci0(ClampI(i0)), cj0(ClampJ(j0));
-		const int ci0p1(ClampI(i0+1)), cj0p1(ClampJ(j0+1));
+		const int ci1(ClampI(i0+1)), cj1(ClampJ(j0+1));
 
 		const TT v00(array_for_this(ci0,cj0)), v10(array_for_this(ci1,cj0)), v01(array_for_this(ci0,cj1)), v11(array_for_this(ci1,cj1));
 		

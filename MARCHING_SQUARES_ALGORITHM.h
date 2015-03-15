@@ -199,4 +199,9 @@ public: // Member Functions
 		}
         END_HEAD_THREAD_WORK;
 	}
+
+    DYNAMIC_ARRAY<VT2>* ContourVertexArray(const int contour_index = 0)
+	{
+	    return &(contour_vertex_array[contour_index]);
+	}
 };
