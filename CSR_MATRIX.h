@@ -4,6 +4,7 @@
 #include "VECTOR_ND.h"
 #include "MULTITHREADING.h"
 
+template <class T> class CSR_MATRIX;
 // compressed sparse row (CSR or CRS) http://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_.28CSR_or_CRS.29
 // see http://developer.download.nvidia.com/compute/DevZone/docs/html/CUDALibraries/doc/CUSPARSE_Library.pdf for CUDA compatable descriptions.
 
@@ -121,7 +122,7 @@ public: // Operator Overloading
 		int vix;
 		vix = row_ptr[row_input];
 
-		while (true)
+		/*while (true)
 		{
 			if (column_index[vix] == column_input)
 			{
@@ -132,16 +133,16 @@ public: // Operator Overloading
 			{
 				vix += 1;
 			}
-		}
+		}*/
 
-		/*for (int vix = row_ptr[row_input]; vix < row_ptr[row_input + 1]; vix++)
+		for (int vix = row_ptr[row_input]; vix < row_ptr[row_input + 1]; vix++)
 		{
 			if (column_index[vix] == column_input)
 			{
 				return values[vix];
 				is_nonzero = true;
 			}
-		}*/
+		}
 
 		if (is_nonzero == false)
 		{
@@ -184,7 +185,7 @@ public: // Member Functions
 		{
 			//check whether the matrix is well-made or not.
 			//it can be omitted in simulation stage.
-//			assert(row_input == prev_row_array_[thread_id]+1);
+			assert(row_input == prev_row_array_[thread_id]+1);
 
 			row_ptr[row_input] = values_ix_array[thread_id];
 			prev_row_array[thread_id] = row_input;

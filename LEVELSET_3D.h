@@ -9,6 +9,8 @@
 #include "DYNAMIC_ARRAY.h"
 #include "LOG.h"
 
+class LEVELSET_3D;
+
 class LEVELSET_3D : public LEVELSET_OBJECT
 {
 public: // Essential Data

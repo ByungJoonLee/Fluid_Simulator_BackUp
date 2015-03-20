@@ -6,6 +6,8 @@
 #include "PCG_METHOD.h"
 #include "GAUSS_SEIDEL_METHOD.h"
 
+class POISOON_SOLVER_3D;
+
 class POISSON_SOLVER_3D
 {
 public: // Essential Data
@@ -160,57 +162,63 @@ public: // Initialization Functions
 	}
 
 public: // Member Functions
-	void Solve(const int& thread_id, FIELD_STRUCTURE_3D<T>& pressure, FIELD_STRUCTURE_3D<T>& density, FIELD_STRUCTURE_3D<int>& bc, const FIELD_STRUCTURE_3D<T>& div, const FIELD_STRUCTURE_3D<T>& variable, const LEVELSET_3D& levelset, LEVELSET_3D& boundary_levelset, const FIELD_STRUCTURE_3D<T>& jc_on_solution, const FIELD_STRUCTURE_3D<T>& jc_on_derivative)
+	void Solve(const int& thread_id, FIELD_STRUCTURE_3D<T>& pressure, FIELD_STRUCTURE_3D<T>& density, FIELD_STRUCTURE_3D<int>& bc, const FIELD_STRUCTURE_3D<T>& div, const FIELD_STRUCTURE_3D<T>& variable, const LEVELSET_3D& levelset, LEVELSET_3D& boundary_levelset, const FIELD_STRUCTURE_3D<T>& jc_on_solution, const FIELD_STRUCTURE_3D<T>& jc_on_derivative, const bool& old_fashioned, const bool& purvis_style)
 	{
 		assert(linear_solver != 0);
 
 		LOG::Begin(thread_id, "Poisson Solve");
 
-		BuildLinearSystemNodeJumpConditionVaribleCoefficient(thread_id, A, x, b, pressure, variable, bc, div, levelset, boundary_levelset, jc_on_solution, jc_on_derivative);
-		//BuildLinearSystemNodeJumpConditionVaribleCoefficientPurvis(thread_id, A, x, b, pressure, variable, bc, div, levelset, boundary_levelset, jc_on_solution, jc_on_derivative);
-	
-		ofstream fout;
-		fout.open("A");
-		fout << "nz = [ ";
+		if (old_fashioned)
+		{
+			BuildLinearSystemNodeJumpConditionVaribleCoefficient(thread_id, A, x, b, pressure, variable, bc, div, levelset, boundary_levelset, jc_on_solution, jc_on_derivative);
+		}
+		if (purvis_style)
+		{
+			BuildLinearSystemNodeJumpConditionVaribleCoefficientPurvis(thread_id, A, x, b, pressure, variable, bc, div, levelset, boundary_levelset, jc_on_solution, jc_on_derivative);
+		}
+		
+		// For debug - set up as a part of code, later
+		/*ofstream fout;
+		fout.open("nz");
 		for (int i = 0; i < A.nz; i++)
 		{
 			fout << A.values[i] << " ";
 		}
-		fout << "]" << endl;
-	
-		fout << "ci = [ ";
+		fout.close();
+
+		fout.open("ci");
 		for (int i = 0; i < A.nz; i++)
 		{
 			fout << A.column_index[i] << " ";
 		}
-		fout << "]" << endl;
+		fout.close();
 
-		fout << "rp = [ ";
+		fout.open("rp");
 		for (int i = 0; i <= A.N; i++)
 		{
 			fout << A.row_ptr[i] << " ";
 		}
-		fout << "]" << endl;
-		fout.close();
+		fout.close();*/
 
 		// Symmetric property test
-		BEGIN_HEAD_THREAD_WORK
+		/*BEGIN_HEAD_THREAD_WORK
 		{
-			cout << A(1,908) << endl;
-			cout << A(908,1) << endl;
-			/*for (int i = 0; i < A.N; i++)
+			for (int i = 0; i < A.N; i++)
 			{
 				for (int j = 0; j < A.N; j++)
 				{
-					if (A(i, j) != A(j, i))
+					if (abs(A(i, j)-A(j, i)) > pow(10,-8))
 					{
-						cout << i << ", " << j << endl;
+						cout << i << " ," << j << endl;
 						cout << "Non-symmetric" << endl;
+						cout << A(i, j) << endl;
+						cout << A(j, i) << endl;
+						system("pause");
 					}
 				}
-			}*/
+			}
 		}
-		END_HEAD_THREAD_WORK;
+		END_HEAD_THREAD_WORK;*/
 
 		T sum_for_b(0);
 		
@@ -552,6 +560,7 @@ public: // Member Functions
 		{
 			if(bc(i, j, k) > -1) ++full_ix;
 			if(bc(i, j, k) == BC_NEUM && levelset.IsCellContained(i, j, k) == true) ++full_ix;
+			if(bc(i, j, k) == BC_OTHER && levelset.IsCellContained(i, j, k) == true) ++full_ix;
 		}
 		END_GRID_ITERATION_3D;
 
@@ -561,12 +570,8 @@ public: // Member Functions
 		BEGIN_GRID_ITERATION_3D(bc.partial_grids[thread_id])
 		{
 			if(bc(i, j, k) > -1) bc(i, j, k) = start_full_ix++;
-		}
-		END_GRID_ITERATION_3D;
-
-		BEGIN_GRID_ITERATION_3D(bc.partial_grids[thread_id])
-		{
 			if(bc(i, j, k) == BC_NEUM && levelset.IsCellContained(i, j, k) == true) bc(i, j, k) = start_full_ix++;
+			if(bc(i, j, k) == BC_OTHER && levelset.IsCellContained(i, j, k) == true) bc(i, j, k) = start_full_ix++;
 		}
 		END_GRID_ITERATION_3D;
 
@@ -2151,6 +2156,17 @@ public: // Member Functions
 					continue;
 				}
 
+				//if (bc(i, j, k) == 0)
+				//{
+				//	cout << bc(i + 1, j, k) << endl;
+				//	cout << bc(i - 1, j, k) << endl;
+				//	cout << bc(i, j + 1, k) << endl;
+				//	cout << bc(i, j - 1, k) << endl;
+				//	cout << bc(i, j, k + 1) << endl;
+				//	cout << bc(i, j, k - 1) << endl;
+				//	//system("pause");
+				//}
+
 				T coef_ijk = 0;					// For optimization, inv_dxdx is multiplied at the end
 				
 				// Define betas
@@ -2312,6 +2328,32 @@ public: // Member Functions
 						A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -beta_u*inv_dzdz);
 					}
 
+					// Neumann Boundary Condition
+					if (bc(i - 1, j, k) == BC_NEUM)
+					{
+						coef_ijk += 0;
+					}
+					if (bc(i + 1, j, k) == BC_NEUM)
+					{
+						coef_ijk += 0;
+					}
+					if (bc(i, j - 1, k) == BC_NEUM)
+					{
+						coef_ijk += 0;
+					}
+					if (bc(i, j + 1, k) == BC_NEUM)
+					{
+						coef_ijk += 0;
+					}
+					if (bc(i, j, k - 1) == BC_NEUM)
+					{
+						coef_ijk += 0;
+					}
+					if (bc(i, j, k + 1) == BC_NEUM)
+					{
+						coef_ijk += 0;
+					}
+
 					b_vector[bc(i, j, k)] = -div(i, j, k);				
 				}
 				else
@@ -2328,6 +2370,19 @@ public: // Member Functions
 					T p7 = boundary_levelset(VT(x_min + (i + (T)0.5)*dx, y_min + (j + (T)0.5)*dy, z_min + (k - (T)0.5)*dz));
 					T p8 = boundary_levelset(VT(x_min + (i - (T)0.5)*dx, y_min + (j + (T)0.5)*dy, z_min + (k - (T)0.5)*dz));
 					
+					/*if (bc(i, j, k) == 0)
+					{
+						cout << "bc == 0" << endl;
+						cout << p1 << endl;
+						cout << p2 << endl;
+						cout << p3 << endl;
+						cout << p4 << endl;
+						cout << p5 << endl;
+						cout << p6 << endl;
+						cout << p7 << endl;
+						cout << p8 << endl;
+					}*/
+					
 					// Note that cylinder is parellel to grid.
 					// Case 1 - p1 < 0 , p5 < 0, others > 0
 					if (p1 < 0 && p2 > 0 && p3 > 0 && p4 > 0 && p5 < 0 && p6 > 0 && p7 > 0 && p8 > 0)
@@ -2340,10 +2395,6 @@ public: // Member Functions
 							coef_ijk += coef_l;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dydy);
 						}
-						if (bc(i + 1, j, k) > -1)
-						{
-							coef_ijk += 0;
-						}
 						if (bc(i, j - 1, k) > -1)
 						{
 							T one_over_2dz2 = (T)0.5/(dz*dz);
@@ -2357,10 +2408,6 @@ public: // Member Functions
 							T coef_t = beta_t*l1*l2*one_over_2dz2;
 							coef_ijk += coef_t;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -coef_t*inv_dydy);
-						}
-						if (bc(i, j, k - 1) > -1)
-						{
-							coef_ijk += 0;
 						}
 						if (bc(i, j, k + 1) > -1)
 						{
@@ -2373,14 +2420,10 @@ public: // Member Functions
 					}
 
 					// Case 2 - p2 < 0 , p6 < 0, others > 0
-					if (p1 > 0 && p2 < 0 && p3 > 0 && p4 > 0 && p5 > 0 && p6 < 0 && p7 > 0 && p8 > 0)
+					else if (p1 > 0 && p2 < 0 && p3 > 0 && p4 > 0 && p5 > 0 && p6 < 0 && p7 > 0 && p8 > 0)
 					{							
 						T l1 = abs(p6)/(abs(p6) + abs(p7))*dz, l2 = abs(p6)/(abs(p5) + abs(p6))*dx;
 							
-						if (bc(i - 1, j, k) > -1)
-						{
-							coef_ijk += 0;
-						}
 						if (bc(i + 1, j, k) > -1)
 						{
 							T coef_r = beta_r*l1*one_over_dy;
@@ -2400,10 +2443,6 @@ public: // Member Functions
 							T coef_t = beta_t*l1*l2*one_over_2dz2;
 							coef_ijk += coef_t;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -coef_t*inv_dydy);
-						}
-						if (bc(i, j, k - 1) > -1)
-						{
-							coef_ijk += 0;
 						}
 						if (bc(i, j, k + 1) > -1)
 						{
@@ -2416,14 +2455,10 @@ public: // Member Functions
 					}
 
 					// Case 3 - p3 < 0 , p7 < 0, others > 0
-					if (p1 > 0 && p2 > 0 && p3 < 0 && p4 > 0 && p5 > 0 && p6 > 0 && p7 < 0 && p8 > 0)
+					else if (p1 > 0 && p2 > 0 && p3 < 0 && p4 > 0 && p5 > 0 && p6 > 0 && p7 < 0 && p8 > 0)
 					{							
 						T l1 = abs(p7)/(abs(p6) + abs(p7))*dz, l2 = abs(p7)/(abs(p7) + abs(p8))*dx;
 							
-						if (bc(i - 1, j, k) > -1)
-						{
-							coef_ijk += 0;
-						}
 						if (bc(i + 1, j, k) > -1)
 						{
 							T coef_r = beta_r*l1*one_over_dy;
@@ -2450,16 +2485,12 @@ public: // Member Functions
 							coef_ijk += coef_d;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -coef_d*inv_dydy);
 						}
-						if (bc(i, j, k + 1) > -1)
-						{
-							coef_ijk += 0;
-						}
-
+						
 						b_vector[bc(i, j, k)] = -(T)0.5*l1*l2*one_over_dx*one_over_dz*div(i, j, k);
 					}
 
 					// Case 4 - p4 < 0 , p8 < 0, others > 0
-					if (p1 > 0 && p2 > 0 && p3 > 0 && p4 < 0 && p5 > 0 && p6 > 0 && p7 > 0 && p8 < 0)
+					else if (p1 > 0 && p2 > 0 && p3 > 0 && p4 < 0 && p5 > 0 && p6 > 0 && p7 > 0 && p8 < 0)
 					{							
 						T l1 = abs(p8)/(abs(p5) + abs(p8))*dz, l2 = abs(p8)/(abs(p7) + abs(p8))*dx;
 							
@@ -2468,10 +2499,6 @@ public: // Member Functions
 							T coef_l = beta_l*l1*one_over_dy;
 							coef_ijk += coef_l;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dydy);
-						}
-						if (bc(i + 1, j, k) > -1)
-						{
-							coef_ijk += 0;
 						}
 						if (bc(i, j - 1, k) > -1)
 						{
@@ -2493,16 +2520,12 @@ public: // Member Functions
 							coef_ijk += coef_d;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -coef_d*inv_dydy);
 						}
-						if (bc(i, j, k + 1) > -1)
-						{
-							coef_ijk += 0;
-						}
-
+						
 						b_vector[bc(i, j, k)] = -(T)0.5*l1*l2*one_over_dx*one_over_dz*div(i, j, k);
 					}
 
 					// Case 5 - p5 < 0 , p6 < 0, others > 0
-					if (p1 > 0 && p2 > 0 && p3 > 0 && p4 > 0 && p5 < 0 && p6 < 0 && p7 > 0 && p8 > 0)
+					else if (p1 > 0 && p2 > 0 && p3 > 0 && p4 > 0 && p5 < 0 && p6 < 0 && p7 > 0 && p8 > 0)
 					{							
 						T l1 = abs(p5)/(abs(p5) + abs(p8))*dz, l2 = abs(p5)/(abs(p1) + abs(p5))*dx;
 							
@@ -2520,19 +2543,11 @@ public: // Member Functions
 							coef_ijk += coef_r;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -coef_r*inv_dydy);
 						}
-						if (bc(i, j - 1, k) > -1)
-						{
-							coef_ijk += 0;
-						}
 						if (bc(i, j + 1, k) > -1)
 						{
 							T coef_t = beta_t*l1*one_over_dy;
 							coef_ijk += coef_t;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -coef_t*inv_dydy);
-						}
-						if (bc(i, j, k - 1) > -1)
-						{
-							coef_ijk += 0;
 						}
 						if (bc(i, j, k + 1) > -1)
 						{
@@ -2545,7 +2560,7 @@ public: // Member Functions
 					}
 
 					// Case 6 - p1 < 0 , p2 < 0, others > 0
-					if (p1 < 0 && p2 < 0 && p3 > 0 && p4 > 0 && p5 > 0 && p6 > 0 && p7 > 0 && p8 > 0)
+					else if (p1 < 0 && p2 < 0 && p3 > 0 && p4 > 0 && p5 > 0 && p6 > 0 && p7 > 0 && p8 > 0)
 					{							
 						T l1 = abs(p1)/(abs(p1) + abs(p4))*dz, l2 = abs(p1)/(abs(p1) + abs(p5))*dx;
 							
@@ -2569,14 +2584,6 @@ public: // Member Functions
 							coef_ijk += coef_b;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -coef_b*inv_dydy);
 						}
-						if (bc(i, j + 1, k) > -1)
-						{
-							coef_ijk += 0;
-						}
-						if (bc(i, j, k - 1) > -1)
-						{
-							coef_ijk += 0;
-						}
 						if (bc(i, j, k + 1) > -1)
 						{
 							T coef_u = beta_u*l2*one_over_dy;
@@ -2588,50 +2595,7 @@ public: // Member Functions
 					}
 
 					// Case 7 - p3 < 0 , p4 < 0, others > 0
-					if (p1 > 0 && p2 > 0 && p3 < 0 && p4 < 0 && p5 > 0 && p6 > 0 && p7 > 0 && p8 > 0)
-					{							
-						T l1 = abs(p3)/(abs(p2) + abs(p3))*dz, l2 = abs(p3)/(abs(p3) + abs(p7))*dx;
-							
-						if (bc(i - 1, j, k) > -1)
-						{
-							T one_over_2dz2 = (T)0.5/(dz*dz);
-							T coef_l = beta_l*l1*l2*one_over_2dz2;
-							coef_ijk += coef_l;
-							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dydy);
-						}
-						if (bc(i + 1, j, k) > -1)
-						{
-							T one_over_2dz2 = (T)0.5/(dz*dz);
-							T coef_r = beta_r*l1*l2*one_over_2dz2;
-							coef_ijk += coef_r;
-							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_r*inv_dydy);
-						}
-						if (bc(i, j - 1, k) > -1)
-						{
-							T coef_b = beta_b*l1*one_over_dy;
-							coef_ijk += coef_b;
-							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -coef_b*inv_dydy);
-						}
-						if (bc(i, j + 1, k) > -1)
-						{
-							coef_ijk += 0;
-						}
-						if (bc(i, j, k - 1) > -1)
-						{
-							T coef_d = beta_d*l2*one_over_dy;
-							coef_ijk += coef_d;
-							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -coef_d*inv_dydy);
-						}
-						if (bc(i, j, k + 1) > -1)
-						{
-							coef_ijk += 0;
-						}
-
-						b_vector[bc(i, j, k)] = -(T)0.5*l1*l2*one_over_dx*one_over_dz*div(i, j, k);
-					}
-
-					// Case 8 - p7 < 0 , p8 < 0, others > 0
-					if (p1 > 0 && p2 > 0 && p3 > 0 && p4 > 0 && p5 > 0 && p6 > 0 && p7 < 0 && p8 < 0)
+					else if (p1 > 0 && p2 > 0 && p3 < 0 && p4 < 0 && p5 > 0 && p6 > 0 && p7 > 0 && p8 > 0)
 					{							
 						T l1 = abs(p3)/(abs(p2) + abs(p3))*dz, l2 = abs(p3)/(abs(p3) + abs(p7))*dx;
 							
@@ -2651,7 +2615,38 @@ public: // Member Functions
 						}
 						if (bc(i, j - 1, k) > -1)
 						{
-							coef_ijk += 0;
+							T coef_b = beta_b*l1*one_over_dy;
+							coef_ijk += coef_b;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -coef_b*inv_dydy);
+						}
+						if (bc(i, j, k - 1) > -1)
+						{
+							T coef_d = beta_d*l2*one_over_dy;
+							coef_ijk += coef_d;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -coef_d*inv_dydy);
+						}
+						
+						b_vector[bc(i, j, k)] = -(T)0.5*l1*l2*one_over_dx*one_over_dz*div(i, j, k);
+					}
+
+					// Case 8 - p7 < 0 , p8 < 0, others > 0
+					else if (p1 > 0 && p2 > 0 && p3 > 0 && p4 > 0 && p5 > 0 && p6 > 0 && p7 < 0 && p8 < 0)
+					{							
+						T l1 = abs(p7)/(abs(p6) + abs(p7))*dz, l2 = abs(p7)/(abs(p3) + abs(p7))*dx;
+							
+						if (bc(i - 1, j, k) > -1)
+						{
+							T one_over_2dz2 = (T)0.5/(dz*dz);
+							T coef_l = beta_l*l1*l2*one_over_2dz2;
+							coef_ijk += coef_l;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dydy);
+						}
+						if (bc(i + 1, j, k) > -1)
+						{
+							T one_over_2dz2 = (T)0.5/(dz*dz);
+							T coef_r = beta_r*l1*l2*one_over_2dz2;
+							coef_ijk += coef_r;
+							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -coef_r*inv_dydy);
 						}
 						if (bc(i, j + 1, k) > -1)
 						{
@@ -2665,16 +2660,12 @@ public: // Member Functions
 							coef_ijk += coef_d;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -coef_d*inv_dydy);
 						}
-						if (bc(i, j, k + 1) > -1)
-						{
-							coef_ijk += 0;
-						}
-
+						
 						b_vector[bc(i, j, k)] = -(T)0.5*l1*l2*one_over_dx*one_over_dz*div(i, j, k);
 					}
 
 					// Case 9 - p1 < 0, p4 < 0, p5 < 0, p8 < 0, other > 0
-					if (p1 < 0 && p2 > 0 && p3 > 0 && p4 < 0 && p5 < 0 && p6 > 0 && p7 > 0 && p8 < 0)
+					else if (p1 < 0 && p2 > 0 && p3 > 0 && p4 < 0 && p5 < 0 && p6 > 0 && p7 > 0 && p8 < 0)
 					{							
 						T l1 = abs(p5)/(abs(p5) + abs(p6))*dx, l2 = abs(p8)/(abs(p7) + abs(p8))*dx;
 							
@@ -2682,10 +2673,6 @@ public: // Member Functions
 						{
 							coef_ijk += beta_l;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -beta_l*inv_dxdx);
-						}
-						if (bc(i + 1, j, k) > -1)
-						{
-							coef_ijk += 0;
 						}
 						if (bc(i, j - 1, k) > -1)
 						{
@@ -2703,15 +2690,13 @@ public: // Member Functions
 						}
 						if (bc(i, j, k - 1) > -1)
 						{
-							T one_over_2dy = (T)0.5/dy;
-							T coef_d = beta_d*(l2 + l2)*one_over_2dy;
+							T coef_d = beta_d*l2*one_over_dy;
 							coef_ijk += coef_d;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -coef_d*inv_dydy);
 						}
 						if (bc(i, j, k + 1) > -1)
 						{
-							T one_over_2dy = (T)0.5/dy;
-							T coef_u = beta_u*(l1 + l1)*one_over_2dy;
+							T coef_u = beta_u*l1*one_over_dy;
 							coef_ijk += coef_u;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -coef_u*inv_dydy);
 						}
@@ -2720,26 +2705,28 @@ public: // Member Functions
 					}
 
 					// Case 10 - p3 < 0, p4 < 0, p7 < 0, p8 < 0, other > 0
-					if (p1 > 0 && p2 > 0 && p3 < 0 && p4 < 0 && p5 > 0 && p6 > 0 && p7 < 0 && p8 < 0)
+					else if (p1 > 0 && p2 > 0 && p3 < 0 && p4 < 0 && p5 > 0 && p6 > 0 && p7 < 0 && p8 < 0)
 					{							
-						T l1 = abs(p8)/(abs(p5) + abs(p8))*dx, l2 = abs(p7)/(abs(p6) + abs(p7))*dx;
+						T l1 = abs(p8)/(abs(p5) + abs(p8))*dx, l2 = abs(p7)/(abs(p6) + abs(p7))*dx, l3 = abs(p4)/(abs(p1) + abs(p4))*dx, l4 = abs(p3)/(abs(p2) + abs(p3))*dx;
 							
 						if (bc(i - 1, j, k) > -1)
 						{
-							T coef_l = beta_l*l1*one_over_dx;
+							T one_over_2dx = (T)0.5*one_over_dx;
+							T coef_l = beta_l*(l1 + l3)*one_over_2dx;
 							coef_ijk += coef_l;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dxdx);
 						}
 						if (bc(i + 1, j, k) > -1)
 						{
-							T coef_r = beta_r*l2*one_over_dx;
+							T one_over_2dx = (T)0.5*one_over_dx;
+							T coef_r = beta_r*(l2 + l4)*one_over_2dx;
 							coef_ijk += coef_r;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -coef_r*inv_dxdx);
 						}
 						if (bc(i, j - 1, k) > -1)
 						{
 							T one_over_2dz = (T)0.5/dz;
-							T coef_b = beta_b*(l1 + l2)*one_over_2dz;
+							T coef_b = beta_b*(l3 + l4)*one_over_2dz;
 							coef_ijk += coef_b;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -coef_b*inv_dydy);
 						}
@@ -2755,23 +2742,15 @@ public: // Member Functions
 							coef_ijk += beta_d;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -beta_d*inv_dydy);
 						}
-						if (bc(i, j, k + 1) > -1)
-						{
-							coef_ijk += 0;
-						}
-
-						b_vector[bc(i, j, k)] = -(T)0.5*(l1 + l2)*one_over_dx*div(i, j, k);
+						
+						b_vector[bc(i, j, k)] = -(T)0.5*(l1 + l3)*one_over_dx*div(i, j, k);
 					}
 
 					// Case 11 - p2 < 0, p3 < 0, p6 < 0, p7 < 0, other > 0
-					if (p1 > 0 && p2 < 0 && p3 < 0 && p4 > 0 && p5 > 0 && p6 < 0 && p7 < 0 && p8 > 0)
+					else if (p1 > 0 && p2 < 0 && p3 < 0 && p4 > 0 && p5 > 0 && p6 < 0 && p7 < 0 && p8 > 0)
 					{							
 						T l1 = abs(p6)/(abs(p5) + abs(p6))*dx, l2 = abs(p7)/(abs(p7) + abs(p8))*dx;
 							
-						if (bc(i - 1, j, k) > -1)
-						{
-							coef_ijk += 0;
-						}
 						if (bc(i + 1, j, k) > -1)
 						{
 							coef_ijk += beta_r;
@@ -2793,15 +2772,13 @@ public: // Member Functions
 						}
 						if (bc(i, j, k - 1) > -1)
 						{
-							T one_over_2dy = (T)0.5/dy;
-							T coef_d = beta_d*(l2 + l2)*one_over_2dy;
+							T coef_d = beta_d*l2*one_over_dy;
 							coef_ijk += coef_d;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -coef_d*inv_dydy);
 						}
 						if (bc(i, j, k + 1) > -1)
 						{
-							T one_over_2dy = (T)0.5/dy;
-							T coef_u = beta_u*(l1 + l1)*one_over_2dy;
+							T coef_u = beta_u*l1*one_over_dy;
 							coef_ijk += coef_u;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -coef_u*inv_dydy);
 						}
@@ -2810,26 +2787,28 @@ public: // Member Functions
 					}
 					
 					// Case 12 - p1 < 0, p2 < 0, p5 < 0, p6 < 0, other > 0
-					if (p1 < 0 && p2 < 0 && p3 > 0 && p4 > 0 && p5 < 0 && p6 < 0 && p7 > 0 && p8 > 0)
+					else if (p1 < 0 && p2 < 0 && p3 > 0 && p4 > 0 && p5 < 0 && p6 < 0 && p7 > 0 && p8 > 0)
 					{							
-						T l1 = abs(p5)/(abs(p5) + abs(p8))*dx, l2 = abs(p6)/(abs(p6) + abs(p7))*dx;
+						T l1 = abs(p5)/(abs(p5) + abs(p8))*dx, l2 = abs(p6)/(abs(p6) + abs(p7))*dx, l3 = abs(p1)/(abs(p1) + abs(p4))*dx, l4 = abs(p2)/(abs(p2) + abs(p3))*dx;
 							
 						if (bc(i - 1, j, k) > -1)
 						{
-							T coef_l = beta_l*l1*one_over_dx;
+							T one_over_2dy = (T)0.5/dy;
+							T coef_l = beta_l*(l1 + l3)*one_over_2dy;
 							coef_ijk += coef_l;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i - 1, j, k), -coef_l*inv_dxdx);
 						}
 						if (bc(i + 1, j, k) > -1)
 						{
-							T coef_r = beta_r*l2*one_over_dx;
+							T one_over_2dy = (T)0.5/dy;
+							T coef_r = beta_r*(l2 + l4)*one_over_2dy;
 							coef_ijk += coef_r;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -coef_r*inv_dxdx);
 						}
 						if (bc(i, j - 1, k) > -1)
 						{
 							T one_over_2dz = (T)0.5/dz;
-							T coef_b = beta_b*(l1 + l2)*one_over_2dz;
+							T coef_b = beta_b*(l3 + l4)*one_over_2dz;
 							coef_ijk += coef_b;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -coef_b*inv_dydy);
 						}
@@ -2840,20 +2819,16 @@ public: // Member Functions
 							coef_ijk += coef_t;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j + 1, k), -coef_t*inv_dydy);
 						}
-						if (bc(i, j, k - 1) > -1)
-						{
-							coef_ijk += 0;
-						}
 						if (bc(i, j, k + 1) > -1)
 						{
 							coef_ijk += beta_u;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -beta_u*inv_dydy);
 						}
 
-						b_vector[bc(i, j, k)] = -(T)0.5*(l1 + l2)*one_over_dx*div(i, j, k);
+						b_vector[bc(i, j, k)] = -(T)0.5*(l1 + l3)*one_over_dx*div(i, j, k);
 					}
 					// Case 13 - p5 < 0, p6 < 0, p7 < 0, p8 < 0, other > 0
-					if (p1 > 0 && p2 > 0 && p3 > 0 && p4 > 0 && p5 < 0 && p6 < 0 && p7 < 0 && p8 < 0)
+					else if (p1 > 0 && p2 > 0 && p3 > 0 && p4 > 0 && p5 < 0 && p6 < 0 && p7 < 0 && p8 < 0)
 					{							
 						T l1 = abs(p5)/(abs(p1) + abs(p5))*dx, l2 = abs(p8)/(abs(p4) + abs(p8))*dx;
 							
@@ -2871,10 +2846,6 @@ public: // Member Functions
 							coef_ijk += coef_r;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i + 1, j, k), -coef_r*inv_dydy);
 						}
-						if (bc(i, j - 1, k) > -1)
-						{
-							coef_ijk += 0;
-						}
 						if (bc(i, j + 1, k) > -1)
 						{
 							coef_ijk += beta_t;
@@ -2882,15 +2853,13 @@ public: // Member Functions
 						}
 						if (bc(i, j, k - 1) > -1)
 						{
-							T one_over_2dy = (T)0.5/dy;
-							T coef_d = beta_d*(l2 + l2)*one_over_2dy;
+							T coef_d = beta_d*l2*one_over_dy;
 							coef_ijk += coef_d;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -coef_d*inv_dydy);
 						}
 						if (bc(i, j, k + 1) > -1)
 						{
-							T one_over_2dy = (T)0.5/dy;
-							T coef_u = beta_u*(l1 + l1)*one_over_2dy;
+							T coef_u = beta_u*l1*one_over_dy;
 							coef_ijk += coef_u;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -coef_u*inv_dydy);
 						}
@@ -2898,10 +2867,10 @@ public: // Member Functions
 						b_vector[bc(i, j, k)] = -(T)0.5*(l1 + l2)*one_over_dx*div(i, j, k);
 					}
 					// Case 14 - p1 < 0, p2 < 0, p3 < 0, p4 < 0, other > 0
-					if (p1 < 0 && p2 < 0 && p3 < 0 && p4 < 0 && p5 > 0 && p6 > 0 && p7 > 0 && p8 > 0)
+					else if (p1 < 0 && p2 < 0 && p3 < 0 && p4 < 0 && p5 > 0 && p6 > 0 && p7 > 0 && p8 > 0)
 					{							
 						T l1 = abs(p1)/(abs(p1) + abs(p5))*dx, l2 = abs(p4)/(abs(p4) + abs(p8))*dx;
-							
+						
 						if (bc(i - 1, j, k) > -1)
 						{
 							T one_over_2dz = (T)0.5/dz;
@@ -2921,21 +2890,15 @@ public: // Member Functions
 							coef_ijk += beta_b;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j - 1, k), -beta_b*inv_dydy);
 						}
-						if (bc(i, j + 1, k) > -1)
-						{
-							coef_ijk += 0;
-						}
 						if (bc(i, j, k - 1) > -1)
 						{
-							T one_over_2dy = (T)0.5/dy;
-							T coef_d = beta_d*(l2 + l2)*one_over_2dy;
+							T coef_d = beta_d*l2*one_over_dy;
 							coef_ijk += coef_d;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k - 1), -coef_d*inv_dydy);
 						}
 						if (bc(i, j, k + 1) > -1)
 						{
-							T one_over_2dy = (T)0.5/dy;
-							T coef_u = beta_u*(l1 + l1)*one_over_2dy;
+							T coef_u = beta_u*l1*one_over_dy;
 							coef_ijk += coef_u;
 							A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k + 1), -coef_u*inv_dydy);
 						}
@@ -2943,7 +2906,7 @@ public: // Member Functions
 						b_vector[bc(i, j, k)] = -(T)0.5*(l1 + l2)*one_over_dx*div(i, j, k);
 					}
 					// Case 15 - p3 > 0, p7 > 0, other < 0
-					if (p1 < 0 && p2 < 0 && p3 > 0 && p4 < 0 && p5 < 0 && p6 < 0 && p7 > 0 && p8 < 0)
+					else if (p1 < 0 && p2 < 0 && p3 > 0 && p4 < 0 && p5 < 0 && p6 < 0 && p7 > 0 && p8 < 0)
 					{
 						T l1 = abs(p8)/(abs(p7) + abs(p8))*dx, l2 = abs(p6)/(abs(p6) + abs(p7))*dx;
 							
@@ -2988,7 +2951,7 @@ public: // Member Functions
 						b_vector[bc(i, j, k)] = -(T)0.5*(1 + l1*one_over_dx + l2*one_over_dz - l1*l2*one_over_dx*one_over_dz)*div(i, j, k);  
 					}
 					// Case 16 - p4 > 0, p8 > 0, other < 0
-					if (p1 < 0 && p2 < 0 && p3 < 0 && p4 > 0 && p5 < 0 && p6 < 0 && p7 < 0 && p8 > 0)
+					else if (p1 < 0 && p2 < 0 && p3 < 0 && p4 > 0 && p5 < 0 && p6 < 0 && p7 < 0 && p8 > 0)
 					{
 						T l1 = abs(p7)/(abs(p7) + abs(p8))*dx, l2 = abs(p5)/(abs(p5) + abs(p8))*dx;
 							
@@ -3032,7 +2995,7 @@ public: // Member Functions
 						b_vector[bc(i, j, k)] = -(T)0.5*(1 + l1*one_over_dx + l2*one_over_dz - l1*l2*one_over_dx*one_over_dz)*div(i, j, k);  
 					}
 					// Case 17 - p1 > 0, p5 > 0, other < 0
-					if (p1 > 0 && p2 < 0 && p3 < 0 && p4 < 0 && p5 > 0 && p6 < 0 && p7 < 0 && p8 < 0)
+					else if (p1 > 0 && p2 < 0 && p3 < 0 && p4 < 0 && p5 > 0 && p6 < 0 && p7 < 0 && p8 < 0)
 					{
 						T l1 = abs(p6)/(abs(p5) + abs(p6))*dx, l2 = abs(p8)/(abs(p5) + abs(p8))*dx;
 							
@@ -3076,7 +3039,7 @@ public: // Member Functions
 						b_vector[bc(i, j, k)] = -(T)0.5*(1 + l1*one_over_dx + l2*one_over_dz - l1*l2*one_over_dx*one_over_dz)*div(i, j, k);  
 					}
 					// Case 18 - p2 > 0, p6 > 0, other < 0
-					if (p1 < 0 && p2 > 0 && p3 < 0 && p4 < 0 && p5 < 0 && p6 > 0 && p7 < 0 && p8 < 0)
+					else if (p1 < 0 && p2 > 0 && p3 < 0 && p4 < 0 && p5 < 0 && p6 > 0 && p7 < 0 && p8 < 0)
 					{
 						T l1 = abs(p5)/(abs(p5) + abs(p6))*dx, l2 = abs(p7)/(abs(p6) + abs(p7))*dx;
 							
@@ -3120,7 +3083,7 @@ public: // Member Functions
 						b_vector[bc(i, j, k)] = -(T)0.5*(1 + l1*one_over_dx + l2*one_over_dz - l1*l2*one_over_dx*one_over_dz)*div(i, j, k);  
 					}
 					// Case 19 - p5 > 0, p6 > 0, other < 0
-					if (p1 < 0 && p2 < 0 && p3 < 0 && p4 < 0 && p5 > 0 && p6 > 0 && p7 < 0 && p8 < 0)
+					else if (p1 < 0 && p2 < 0 && p3 < 0 && p4 < 0 && p5 > 0 && p6 > 0 && p7 < 0 && p8 < 0)
 					{
 						T l1 = abs(p7)/(abs(p6) + abs(p7))*dx, l2 = abs(p2)/(abs(p2) + abs(p6))*dx;
 							
@@ -3164,7 +3127,7 @@ public: // Member Functions
 						b_vector[bc(i, j, k)] = -(T)0.5*(1 + l1*one_over_dx + l2*one_over_dy - l1*l2*one_over_dx*one_over_dy)*div(i, j, k);  
 					}
 					// Case 20 - p7 > 0, p8 > 0, other < 0
-					if (p1 < 0 && p2 < 0 && p3 < 0 && p4 < 0 && p5 < 0 && p6 < 0 && p7 > 0 && p8 > 0)
+					else if (p1 < 0 && p2 < 0 && p3 < 0 && p4 < 0 && p5 < 0 && p6 < 0 && p7 > 0 && p8 > 0)
 					{
 						T l1 = abs(p5)/(abs(p5) + abs(p8))*dx, l2 = abs(p4)/(abs(p4) + abs(p8))*dx;
 							
@@ -3208,7 +3171,7 @@ public: // Member Functions
 						b_vector[bc(i, j, k)] = -(T)0.5*(1 + l1*one_over_dx + l2*one_over_dy - l1*l2*one_over_dx*one_over_dy)*div(i, j, k);  
 					}
 					// Case 21 - p3 > 0, p4 > 0, other < 0
-					if (p1 < 0 && p2 < 0 && p3 >0 && p4 > 0 && p5 < 0 && p6 < 0 && p7 < 0 && p8 < 0)
+					else if (p1 < 0 && p2 < 0 && p3 >0 && p4 > 0 && p5 < 0 && p6 < 0 && p7 < 0 && p8 < 0)
 					{
 						T l1 = abs(p8)/(abs(p4) + abs(p8))*dx, l2 = abs(p1)/(abs(p1) + abs(p4))*dx;
 							
@@ -3252,7 +3215,7 @@ public: // Member Functions
 						b_vector[bc(i, j, k)] = -(T)0.5*(1 + l1*one_over_dx + l2*one_over_dy - l1*l2*one_over_dx*one_over_dy)*div(i, j, k);  
 					}
 					// Case 22 - p1 > 0, p2 > 0, other < 0
-					if (p1 > 0 && p2 > 0 && p3 < 0 && p4 < 0 && p5 < 0 && p6 < 0 && p7 < 0 && p8 < 0)
+					else if (p1 > 0 && p2 > 0 && p3 < 0 && p4 < 0 && p5 < 0 && p6 < 0 && p7 < 0 && p8 < 0)
 					{
 						T l1 = abs(p3)/(abs(p2) + abs(p3))*dx, l2 = abs(p6)/(abs(p2) + abs(p6))*dx;
 							
@@ -3295,6 +3258,11 @@ public: // Member Functions
 
 						b_vector[bc(i, j, k)] = -(T)0.5*(1 + l1*one_over_dx + l2*one_over_dy - l1*l2*one_over_dx*one_over_dy)*div(i, j, k);  
 					}
+					else
+					{
+						cout << i << ", " << j << ", " << k << endl;
+						system("pause");
+					}
 				}
 
 				// Periodic Boundary Condition
@@ -3316,7 +3284,38 @@ public: // Member Functions
 					j_start_for_domain = j;
 					k_start_for_domain = k;
 				}
-							
+
+				// Tuning the given matrix into the invertiable matrix -- "On deflation and singular symmetric positive semi-definite matrices -- J.M.Tang, C.Vuik"
+				if ((i == i_start_for_domain) && (j == j_start_for_domain) && (k == k_start_for_domain))
+				{
+					if (bc(i - 1, j, k) < 0)
+					{
+						coef_ijk += beta_l;
+						//coef_ijk += 0;
+					}
+					if (bc(i + 1, j, k) < 0)
+					{
+						coef_ijk += 0;
+					}
+					if (bc(i, j - 1, k) < 0)
+					{
+						coef_ijk += 0;
+					}
+					if (bc(i, j + 1, k) < 0)
+					{
+						coef_ijk += 0;
+					}
+					if (bc(i, j, k - 1) < 0)
+					{
+						//coef_ijk += beta_d;
+						coef_ijk += 0;
+					}
+					if (bc(i, j, k + 1) < 0)
+					{
+						coef_ijk += 0;
+					}
+				}
+
 				if (coef_ijk == 0)
 				{
 					coef_ijk = 1;
@@ -3324,7 +3323,7 @@ public: // Member Functions
 				
 				A_matrix.AssignValue(thread_id, bc(i, j, k), bc(i, j, k), inv_dxdx*(T)coef_ijk);
 	
-				b_vector[bc(i, j, k)] = -div(i, j, k) - F_X - F_Y - F_Z;
+				b_vector[bc(i, j, k)] = b_vector[bc(i, j, k)] - F_X - F_Y - F_Z;
 				
 				if (bc(i - 1, j, k) == BC_DIR)
 				{

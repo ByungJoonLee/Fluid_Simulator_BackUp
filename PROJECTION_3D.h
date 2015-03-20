@@ -6,6 +6,8 @@
 
 enum PROJECTION_TYPE				{FREE_SURFACE_WATER, AIR, MULTIPHASE};
 
+class PROJECTION_3D;
+
 class PROJECTION_3D
 {
 public: // References of the variables which are defined in EULERIAN_FLUID_SOLVER_3D class
@@ -133,6 +135,8 @@ public: // For Cylinder Pipe
 	FIELD_STRUCTURE_3D<T>			boundary_phi_y;
 	FIELD_STRUCTURE_3D<T>			boundary_phi_z;
 
+public: // Boundary Treatment
+	bool							old_fashioned, purvis_style;
 public: // Constructors and Destructor
 	PROJECTION_3D(MULTITHREADING* multithreading_input, LEVELSET_3D& water_levelset_input, FIELD_STRUCTURE_3D<T>& water_velocity_field_mac_x_input, FIELD_STRUCTURE_3D<T>& water_velocity_field_mac_y_input, FIELD_STRUCTURE_3D<T>& water_velocity_field_mac_z_input, 
 				  FIELD_STRUCTURE_3D<T>& water_velocity_field_mac_ghost_x_input, FIELD_STRUCTURE_3D<T>& water_velocity_field_mac_ghost_y_input, FIELD_STRUCTURE_3D<T>& water_velocity_field_mac_ghost_z_input, LEVELSET_3D& boundary_levelset_input, int& frame_input, 
@@ -162,7 +166,8 @@ public: // Constructors and Destructor
 					frame(frame_input), air_bubble_rising(false), water_drop(false),
 					max_velocity_x((T)0), max_velocity_y((T)0), max_velocity_z((T)0),
 					air_density((T)0), water_density((T)0), oil_density((T)0),
-					air_water_simulation(false), oil_water_simulation(false), dimensionless_form(false), Dirichlet_Boundary_Condition(false), Neumann_Boundary_Condition(false), CSF_model(false), regular_boundary(false), cylindrical_boundary(false), is_vertical(false), is_parallel(false)
+					air_water_simulation(false), oil_water_simulation(false), dimensionless_form(false), Dirichlet_Boundary_Condition(false), Neumann_Boundary_Condition(false), CSF_model(false), regular_boundary(false), cylindrical_boundary(false), is_vertical(false), is_parallel(false),
+					old_fashioned(false), purvis_style(false)
 	{}
 
 	~PROJECTION_3D(void)
@@ -182,6 +187,10 @@ public: // Initialization Functions
 		Dirichlet_Boundary_Condition = projection_block.GetBoolean("Dirichlet_Boundary_Condition", (bool)false);
 		Neumann_Boundary_Condition = projection_block.GetBoolean("Neumann_Boundary_Condition", (bool)false);
 		
+		// Boundary Treatment
+		old_fashioned = projection_block.GetBoolean("old_fashioned", (bool)true);
+		purvis_style = projection_block.GetBoolean("purvis_style", (bool)false);
+
 		if (air_water_simulation)
 		{
 			air_bubble_rising = projection_block.GetBoolean("air_bubble_rising", false);
@@ -398,6 +407,9 @@ public: // Initialization Functions
 
 		// Ghost levelset
 		scalar_field_ghost.Initialize(multithreading, water_levelset.grid, 2);
+
+		
+		
 	}
 	
 public: // Solver
@@ -468,41 +480,82 @@ public: // Solver
 		{
 			BEGIN_HEAD_THREAD_WORK
 			{
-				fout.open("Pressure_neum_x");
-			
-				for (int i = pressure_field.i_start; i <= pressure_field.i_end; i++)
+				if (old_fashioned)
 				{
-					for (int j = pressure_field.j_start; j <= pressure_field.j_end; j++)
-					{
-						fout << pressure_field(i, j, pressure_field.k_end/2) << " ";
-					}
-					fout << "\n";
-				}
-				fout.close(); 
+					fout.open("Pressure_neum_x");
 
-				fout.open("Pressure_neum_y");
-			
-				for (int k = pressure_field.k_start; k <= pressure_field.k_end; k++)
-				{
 					for (int i = pressure_field.i_start; i <= pressure_field.i_end; i++)
 					{
-						fout << pressure_field(i, pressure_field.j_end/2, k) << " ";
+						for (int j = pressure_field.j_start; j <= pressure_field.j_end; j++)
+						{
+							fout << pressure_field(i, j, pressure_field.k_end/2) << " ";
+						}
+						fout << "\n";
 					}
-					fout << "\n";
-				}
-				fout.close(); 
-				
-				fout.open("Pressure_neum_z");
-			
-				for (int j = pressure_field.j_start; j <= pressure_field.j_end; j++)
-				{
+					fout.close(); 
+
+					fout.open("Pressure_neum_y");
+
 					for (int k = pressure_field.k_start; k <= pressure_field.k_end; k++)
 					{
-						fout << pressure_field(pressure_field.i_end/2, j, k) << " ";
+						for (int i = pressure_field.i_start; i <= pressure_field.i_end; i++)
+						{
+							fout << pressure_field(i, pressure_field.j_end/2, k) << " ";
+						}
+						fout << "\n";
 					}
-					fout << "\n";
+					fout.close(); 
+
+					fout.open("Pressure_neum_z");
+
+					for (int j = pressure_field.j_start; j <= pressure_field.j_end; j++)
+					{
+						for (int k = pressure_field.k_start; k <= pressure_field.k_end; k++)
+						{
+							fout << pressure_field(pressure_field.i_end/2, j, k) << " ";
+						}
+						fout << "\n";
+					}
+					fout.close();  
 				}
-				fout.close(); 
+				if (purvis_style)
+				{
+					fout.open("Pressure_neum_x_purvis");
+
+					for (int i = pressure_field.i_start; i <= pressure_field.i_end; i++)
+					{
+						for (int j = pressure_field.j_start; j <= pressure_field.j_end; j++)
+						{
+							fout << pressure_field(i, j, pressure_field.k_end/2) << " ";
+						}
+						fout << "\n";
+					}
+					fout.close(); 
+
+					fout.open("Pressure_neum_y_purvis");
+
+					for (int k = pressure_field.k_start; k <= pressure_field.k_end; k++)
+					{
+						for (int i = pressure_field.i_start; i <= pressure_field.i_end; i++)
+						{
+							fout << pressure_field(i, pressure_field.j_end/2, k) << " ";
+						}
+						fout << "\n";
+					}
+					fout.close(); 
+
+					fout.open("Pressure_neum_z_purvis");
+
+					for (int j = pressure_field.j_start; j <= pressure_field.j_end; j++)
+					{
+						for (int k = pressure_field.k_start; k <= pressure_field.k_end; k++)
+						{
+							fout << pressure_field(pressure_field.i_end/2, j, k) << " ";
+						}
+						fout << "\n";
+					}
+					fout.close();  
+				}
 			}
 			END_HEAD_THREAD_WORK;
 		}
@@ -777,7 +830,7 @@ public: // Solver
 
 		boundary_levelset.ComputeNormals(thread_id);
 
-		poisson_solver.Solve(thread_id, pressure_field, projection_density_field, boundary_condition_field, divergence_field, one_over_density, water_levelset, boundary_levelset, jc_on_solution, jc_on_derivative);
+		poisson_solver.Solve(thread_id, pressure_field, projection_density_field, boundary_condition_field, divergence_field, one_over_density, water_levelset, boundary_levelset, jc_on_solution, jc_on_derivative, old_fashioned, purvis_style);
 	}
 
 	void UpdateVelocity(const int& thread_id, const T& dt)
@@ -1129,9 +1182,13 @@ public: // Member Functions
 				
 				const T one_over_density_half_x = 1/density_half_x(i, j, k);
 				
+				const T bc = boundary_condition_array(i, j, k);
+				const T bc_l = boundary_condition_array(i - 1, j, k);
+
 				if (is_vertical)
 				{
-					if (boundary_levelset_ijk*boundary_levelset_ijk_l >= 0)
+					//if (boundary_levelset_ijk*boundary_levelset_ijk_l >= 0)
+					if (bc*bc_l >= 0)
 					{
 						if (levelset_ijk*levelset_ijk_l > 0)
 						{
@@ -1155,7 +1212,8 @@ public: // Member Functions
 				{
 					if (boundary_levelset_ijk*boundary_levelset_ijk_l >= 0)
 					{
-						if (levelset_ijk*levelset_ijk_l > 0)
+						//if (levelset_ijk*levelset_ijk_l > 0)
+						if (bc*bc_l > 0)
 						{
 							velocity_ijk -= dt*(pressure_field(i, j, k) - pressure_field(i - 1, j , k))*one_over_density_ijk*one_over_dx;
 						}
@@ -1233,9 +1291,13 @@ public: // Member Functions
 				
 				const T one_over_density_half_y = 1/density_half_y(i, j, k);
 				
+				const T bc = boundary_condition_array(i, j, k);
+				const T bc_b = boundary_condition_array(i, j - 1, k);
+
 				if (is_vertical)
 				{
-					if ((boundary_levelset_ijk*boundary_levelset_ijk_b >= 0) && (j != velocity_field.grid.j_start) && (j <= (velocity_field.grid.j_end - 1)))
+					//if ((boundary_levelset_ijk*boundary_levelset_ijk_b >= 0) && (j != velocity_field.grid.j_start) && (j <= (velocity_field.grid.j_end - 1)))
+					if ((bc*bc_b >= 0) && (j != velocity_field.grid.j_start) && (j <= (velocity_field.grid.j_end - 1)))
 					{
 						if (levelset_ijk*levelset_ijk_b > 0)
 						{
@@ -1257,7 +1319,8 @@ public: // Member Functions
 				
 				if (is_parallel)
 				{
-					if (boundary_levelset_ijk*boundary_levelset_ijk_b >= 0)
+					//if (boundary_levelset_ijk*boundary_levelset_ijk_b >= 0)
+					if (bc*bc_b >= 0)
 					{
 						if (levelset_ijk*levelset_ijk_b > 0)
 						{
@@ -1337,7 +1400,11 @@ public: // Member Functions
 				
 				const T one_over_density_half_z = 1/density_half_z(i, j, k);
 				
-				if (boundary_levelset_ijk*boundary_levelset_ijk_d >= 0)
+				const T bc = boundary_condition_array(i, j, k);
+				const T bc_d = boundary_condition_array(i, j, k - 1);
+
+				//if (boundary_levelset_ijk*boundary_levelset_ijk_d >= 0)
+				if (bc*bc_d >= 0)
 				{
 					if (levelset_ijk*levelset_ijk_d > 0)
 					{

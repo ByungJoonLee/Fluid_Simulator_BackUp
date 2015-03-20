@@ -104,7 +104,8 @@ public: // Member Functions
 		max_dt = script_block_for_this.GetFloat("max_dt", (T)100);
 		CFL = script_block_for_this.GetFloat("CFL", (T)0);
 		frame_rate = script_block_for_this.GetFloat("frame_rate", (T)24);
-		
+		accu_dt = (T)0;
+
 		num_substeps = script_block_for_this.GetInteger("num_substeps", (int)1);
 
 		use_eulerian_solver = script_block_for_this.GetBoolean("use_eulerian_solver");

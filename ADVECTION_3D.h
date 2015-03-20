@@ -4,6 +4,8 @@
 #include "ADVECTION_METHOD_3D.h"
 //#include "FAST_ITERATIVE_METHOD.h"
 
+class ADVECTION_3D;
+
 class ADVECTION_3D
 {
 public:

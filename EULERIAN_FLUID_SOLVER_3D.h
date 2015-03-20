@@ -855,6 +855,33 @@ public: // Advancing
 				water_levelset->arr(i, j, k) = (T)0.5*(temp_for_levelset(i, j, k) + water_levelset->arr(i, j, k));
 			}
 			END_GRID_ITERATION_3D;
+
+            if (is_vertical)
+			{
+				fout.open("water_levelset");
+				for (int k = water_levelset->grid.k_start; k <= water_levelset->grid.k_end; k++)
+				{
+					for (int j = water_levelset->grid.j_start; j <= water_levelset->grid.j_end; j++)
+					{
+						fout << water_levelset->arr(water_levelset->grid.i_end/2, j, k) << " ";
+					}
+					fout << "\n";
+				}
+				fout.close(); 
+			}
+			if (is_parallel)
+			{
+				fout.open("water_levelset");
+				for (int i = water_levelset->grid.i_start; i <= water_levelset->grid.i_end; i++)
+				{
+					for (int j = water_levelset->grid.j_start; j <= water_levelset->grid.j_end; j++)
+					{
+						fout << water_levelset->arr(i, j, water_levelset->grid.k_end/2) << " ";
+					}
+					fout << "\n";
+				}
+				fout.close(); 
+			}
 		}
 		if (order_for_time_advancing == 2)
 		{
@@ -1425,6 +1452,7 @@ public: // Advancing
 
 	void SolveForRK(const int& thread_id, const T& dt)
 	{
+		ofstream fout;
 		if (is_Velocity_advection_active)
 		{
 			Velocity_Advection(thread_id, dt);
@@ -1445,6 +1473,116 @@ public: // Advancing
 		if (is_projection_active)
 		{
 			Projection(thread_id, dt);
+		}
+        
+		if (is_vertical)
+		{
+			fout.open("velocity_x_after_projection");
+			for (int i = water_velocity_field_mac_x->i_start; i <= water_velocity_field_mac_x->i_end; i++)
+			{
+				for (int j = water_velocity_field_mac_x->j_start; j <= water_velocity_field_mac_x->j_end; j++)
+				{
+					fout << water_velocity_field_mac_x->array_for_this(i, j, water_velocity_field_mac_x->k_end/2) << " ";
+				}
+				fout << "\n";
+			}
+			fout.close();
+
+			fout.open("velocity_y_after_projection");
+			for (int j = water_velocity_field_mac_y->j_start; j <= water_velocity_field_mac_y->j_end; j++)
+			{
+				for (int k = water_velocity_field_mac_y->k_start; k <= water_velocity_field_mac_y->k_end; k++)
+				{
+					fout << water_velocity_field_mac_y->array_for_this(water_velocity_field_mac_y->i_end/2, j, k) << " ";
+				}
+				fout << "\n";
+			}
+			fout.close();
+
+			fout.open("velocity_z_after_projection");
+			for (int j = water_velocity_field_mac_z->j_start; j <= water_velocity_field_mac_z->j_end; j++)
+			{
+				for (int k = water_velocity_field_mac_z->k_start; k <= water_velocity_field_mac_z->k_end; k++)
+				{
+					fout << water_velocity_field_mac_z->array_for_this(water_velocity_field_mac_z->i_end/2, j, k) << " ";
+				}
+				fout << "\n";
+			}
+			fout.close(); 
+		}
+
+		if (is_parallel)
+		{
+			if (water_projection->old_fashioned)
+			{
+				fout.open("velocity_x_after_projection");
+				for (int i = water_velocity_field_mac_x->i_start; i <= water_velocity_field_mac_x->i_end; i++)
+				{
+					for (int j = water_velocity_field_mac_x->j_start; j <= water_velocity_field_mac_x->j_end; j++)
+					{
+						fout << water_velocity_field_mac_x->array_for_this(i, j, water_velocity_field_mac_x->k_end/2) << " ";
+					}
+					fout << "\n";
+				}
+				fout.close();
+
+				fout.open("velocity_y_after_projection");
+				for (int i = water_velocity_field_mac_y->i_start; i <= water_velocity_field_mac_y->i_end; i++)
+				{
+					for (int j = water_velocity_field_mac_y->j_start; j <= water_velocity_field_mac_y->j_end; j++)
+					{
+						fout << water_velocity_field_mac_y->array_for_this(i, j, water_velocity_field_mac_y->k_end/2) << " ";
+					}
+					fout << "\n";
+				}
+				fout.close();
+
+				fout.open("velocity_z_after_projection");
+				for (int i = water_velocity_field_mac_z->i_start; i <= water_velocity_field_mac_z->i_end; i++)
+				{
+					for (int j = water_velocity_field_mac_z->j_start; j <= water_velocity_field_mac_z->j_end; j++)
+					{
+						fout << water_velocity_field_mac_z->array_for_this(i, j, water_velocity_field_mac_z->k_end/2) << " ";
+					}
+					fout << "\n";
+				}
+				fout.close();  
+			}
+            if (water_projection->purvis_style)
+			{
+				fout.open("velocity_x_after_projection_purvis");
+				for (int i = water_velocity_field_mac_x->i_start; i <= water_velocity_field_mac_x->i_end; i++)
+				{
+					for (int j = water_velocity_field_mac_x->j_start; j <= water_velocity_field_mac_x->j_end; j++)
+					{
+						fout << water_velocity_field_mac_x->array_for_this(i, j, water_velocity_field_mac_x->k_end/2) << " ";
+					}
+					fout << "\n";
+				}
+				fout.close();
+
+				fout.open("velocity_y_after_projection_purvis");
+				for (int i = water_velocity_field_mac_y->i_start; i <= water_velocity_field_mac_y->i_end; i++)
+				{
+					for (int j = water_velocity_field_mac_y->j_start; j <= water_velocity_field_mac_y->j_end; j++)
+					{
+						fout << water_velocity_field_mac_y->array_for_this(i, j, water_velocity_field_mac_y->k_end/2) << " ";
+					}
+					fout << "\n";
+				}
+				fout.close();
+
+				fout.open("velocity_z_after_projection_purvis");
+				for (int i = water_velocity_field_mac_z->i_start; i <= water_velocity_field_mac_z->i_end; i++)
+				{
+					for (int j = water_velocity_field_mac_z->j_start; j <= water_velocity_field_mac_z->j_end; j++)
+					{
+						fout << water_velocity_field_mac_z->array_for_this(i, j, water_velocity_field_mac_z->k_end/2) << " ";
+					}
+					fout << "\n";
+				}
+				fout.close();  
+			}
 		}
 	}
 	

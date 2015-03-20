@@ -13,6 +13,9 @@
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
 
+struct DISPLAY_INFO;
+class SIMULATION_MANAGER;
+
 struct DISPLAY_INFO
 {
 	string camera_mode;
@@ -55,6 +58,7 @@ public: // Constructor and Destructor
 		dp_info.is_capture_image = false;
 		dp_info.is_capture_move_at_last_frame = false;
 		total_time.zero();
+        simulation_time.zero();
 	}
 
 	~SIMULATION_MANAGER(void)
@@ -214,7 +218,9 @@ public: // Initialization Functions
 		{
 			writer->Initialize(simulation);
 		}
-	}
+        total_time.zero();
+        simulation_time.zero(); 
+    }
 
 	void Render()
 	{
