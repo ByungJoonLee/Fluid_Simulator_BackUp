@@ -137,8 +137,6 @@ public: // For Cylinder Pipe
 
 public: // Boundary Treatment
 	bool							old_fashioned, purvis_style;
-	bool							periodic_boundary;
-
 public: // Constructors and Destructor
 	PROJECTION_3D(MULTITHREADING* multithreading_input, LEVELSET_3D& water_levelset_input, FIELD_STRUCTURE_3D<T>& water_velocity_field_mac_x_input, FIELD_STRUCTURE_3D<T>& water_velocity_field_mac_y_input, FIELD_STRUCTURE_3D<T>& water_velocity_field_mac_z_input, 
 				  FIELD_STRUCTURE_3D<T>& water_velocity_field_mac_ghost_x_input, FIELD_STRUCTURE_3D<T>& water_velocity_field_mac_ghost_y_input, FIELD_STRUCTURE_3D<T>& water_velocity_field_mac_ghost_z_input, LEVELSET_3D& boundary_levelset_input, int& frame_input, 
@@ -169,7 +167,7 @@ public: // Constructors and Destructor
 					max_velocity_x((T)0), max_velocity_y((T)0), max_velocity_z((T)0),
 					air_density((T)0), water_density((T)0), oil_density((T)0),
 					air_water_simulation(false), oil_water_simulation(false), dimensionless_form(false), Dirichlet_Boundary_Condition(false), Neumann_Boundary_Condition(false), CSF_model(false), regular_boundary(false), cylindrical_boundary(false), is_vertical(false), is_parallel(false),
-					old_fashioned(false), purvis_style(false), periodic_boundary(false)
+					old_fashioned(false), purvis_style(false)
 	{}
 
 	~PROJECTION_3D(void)
@@ -192,7 +190,7 @@ public: // Initialization Functions
 		// Boundary Treatment
 		old_fashioned = projection_block.GetBoolean("old_fashioned", (bool)true);
 		purvis_style = projection_block.GetBoolean("purvis_style", (bool)false);
-		
+
 		if (air_water_simulation)
 		{
 			air_bubble_rising = projection_block.GetBoolean("air_bubble_rising", false);
@@ -381,28 +379,10 @@ public: // Initialization Functions
 		poisson_solver.Dirichlet_Boundary_Condition = Dirichlet_Boundary_Condition;
 		poisson_solver.Neumann_Boundary_Condition = Neumann_Boundary_Condition;
 
-		if (poisson_solver.Neumann_Boundary_Condition == true)
-		{
-			poisson_solver.one_point_fixed = projection_block.GetBoolean("one_point_fixed", (bool)false);
-			poisson_solver.projecting_space_without_null = projection_block.GetBoolean("projecting_space_without_null", (bool)false);
-			poisson_solver.linear_solver->one_point_fixed = poisson_solver.one_point_fixed;
-			poisson_solver.linear_solver->projecting_space_without_null = poisson_solver.projecting_space_without_null;
-			
-			if (poisson_solver.one_point_fixed)
-			{
-				cout << "  One Point Fixed Solver For Neumann: " << "true" << endl;
-			}
-			if (poisson_solver.projecting_space_without_null)
-			{
-				cout << "  Projecting Space without Null For Neumann: " << "true" << endl;
-			}
-		}
-		
 		if (use_variable_density)
 		{
 			poisson_solver.use_variable_density = true;
 		}
-
 		poisson_solver.place_dirichlet_bc_at_face = place_dirichlet_bc_at_face;
 		poisson_solver.air_water_simulation = air_water_simulation;
 		poisson_solver.oil_water_simulation = oil_water_simulation;
@@ -437,20 +417,13 @@ public: // Solver
 	{
 		if (oil_water_simulation)
 		{
-			if (periodic_boundary)
+			if (is_vertical)
 			{
-				if (is_vertical)
-				{
-					water_levelset.signed_distance_field.FillGhostCellsPeriodicInYDirection(thread_id, water_levelset.arr, false);
-				}
-				if (is_parallel)
-				{
-					water_levelset.signed_distance_field.FillGhostCellsPeriodicInXDirection(thread_id, water_levelset.arr, false);
-				} 
+				water_levelset.signed_distance_field.FillGhostCellsPeriodicInYDirection(thread_id, water_levelset.arr, false);
 			}
-			else
+			if (is_parallel)
 			{
-				water_levelset.signed_distance_field.FillGhostCellsContinuousDerivativesFrom(thread_id, water_levelset.arr, true);
+				water_levelset.signed_distance_field.FillGhostCellsPeriodicInXDirection(thread_id, water_levelset.arr, false);
 			}
 		}
 		
@@ -1455,36 +1428,22 @@ public: // Member Functions
 
 			if (oil_water_simulation)
 			{
-				if (periodic_boundary)
+				if (is_vertical)
 				{
-					if (is_vertical)
+					BEGIN_GRID_ITERATION_3D(velocity_field.partial_grids[thread_id])
 					{
-						BEGIN_GRID_ITERATION_3D(velocity_field.partial_grids[thread_id])
-						{
-							velocity_field(i, velocity_field.grid.j_end, k) = velocity_field(i, velocity_field.grid.j_start, k);
-						}
-						END_GRID_ITERATION_3D;  
+						velocity_field(i, velocity_field.grid.j_end, k) = velocity_field(i, velocity_field.grid.j_start, k);
 					}
-					if (is_parallel)
-					{
-						BEGIN_GRID_ITERATION_3D(velocity_field.partial_grids[thread_id])
-						{
-							velocity_field(velocity_field.grid.i_end, j, k) = velocity_field(velocity_field.grid.i_start, j, k);
-						}
-						END_GRID_ITERATION_3D;  
-					} 
+					END_GRID_ITERATION_3D;  
 				}
-				/*else
+				if (is_parallel)
 				{
-					if (is_vertical)
+					BEGIN_GRID_ITERATION_3D(velocity_field.partial_grids[thread_id])
 					{
-						velocity_field.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, velocity_field.array_for_this, false); 
+						velocity_field(velocity_field.grid.i_end, j, k) = velocity_field(velocity_field.grid.i_start, j, k);
 					}
-					if (is_parallel)
-					{
-						velocity_field.FillGhostCellsContinuousDerivativesFromXDirectional(thread_id, velocity_field.array_for_this, false); 
-					}
-				}*/
+					END_GRID_ITERATION_3D;  
+				}
 			}
 		}
 	}
@@ -1612,19 +1571,10 @@ public: // Sub Functions
 
 			if (is_vertical)
 			{
-				if (periodic_boundary)
-				{
-					vector_field_mac_ghost_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-					vector_field_mac_ghost_y.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-					vector_field_mac_ghost_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true); 
-				}
-				else
-				{
-					vector_field_mac_ghost_x.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-					vector_field_mac_ghost_y.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-					vector_field_mac_ghost_z.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-				}
-
+				vector_field_mac_ghost_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+				vector_field_mac_ghost_y.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+				vector_field_mac_ghost_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+			
 				BEGIN_GRID_ITERATION_3D(boundary_phi_x.partial_grids[thread_id])
 				{
 					if (boundary_phi_x(i, j, k) > 0)
@@ -1679,19 +1629,11 @@ public: // Sub Functions
 			}
 			if (is_parallel)
 			{
-				if (periodic_boundary)
-				{
-					vector_field_mac_ghost_x.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-					vector_field_mac_ghost_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-					vector_field_mac_ghost_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true); 
-				}
-				else
-				{
-					vector_field_mac_ghost_x.FillGhostCellsContinuousDerivativesFromXDirectionalVelocity(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-					vector_field_mac_ghost_y.FillGhostCellsContinuousDerivativesFromXDirectionalVelocity(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-					vector_field_mac_ghost_z.FillGhostCellsContinuousDerivativesFromXDirectionalVelocity(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-				}
-
+				// Periodic Boundary Condition
+				vector_field_mac_ghost_x.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+				vector_field_mac_ghost_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+				vector_field_mac_ghost_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+			
 				BEGIN_GRID_ITERATION_3D(boundary_phi_z.partial_grids[thread_id])
 				{
 					if (boundary_phi_z(i, j, k) > 0)

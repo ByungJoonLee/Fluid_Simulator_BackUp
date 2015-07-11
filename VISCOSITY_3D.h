@@ -166,7 +166,6 @@ public: // Pipe Radius
 
 public: // Boundary Order for Velocity
 	int							boundary_order_velocity;
-    bool                        periodic_boundary;
 
 public: // Constructor and Destructor
 	VISCOSITY_3D(MULTITHREADING& multithreading_input, LEVELSET_3D& water_levelset_input, LEVELSET_3D& boundary_levelset_input, FIELD_STRUCTURE_3D<T>& water_velocity_field_mac_x_input, FIELD_STRUCTURE_3D<T>& water_velocity_field_mac_y_input, FIELD_STRUCTURE_3D<T>& water_velocity_field_mac_z_input,
@@ -175,7 +174,7 @@ public: // Constructor and Destructor
 				 water_velocity_field_mac_x(water_velocity_field_mac_x_input), water_velocity_field_mac_y(water_velocity_field_mac_y_input), water_velocity_field_mac_z(water_velocity_field_mac_z_input), 
 				 scalar_field_ghost(scalar_field_ghost_input), velocity_field_mac_ghost_x(velocity_field_mac_ghost_x_input), velocity_field_mac_ghost_y(velocity_field_mac_ghost_y_input), velocity_field_mac_ghost_z(velocity_field_mac_ghost_z_input),
                  air_density((T)0), water_density((T)0), oil_density((T)0), air_viscosity((T)0), water_viscosity((T)0), oil_viscosity((T)0), air_bubble_rising(false), water_drop(false), air_water_simulation(false), oil_water_simulation(false), semi_implicit_approach(false), dimensionless_form(false),
-				 regular_boundary(false), cylindrical_boundary(false), is_vertical(false), is_parallel(false), boundary_order_velocity((int)1), periodic_boundary(false)
+				 regular_boundary(false), cylindrical_boundary(false), is_vertical(false), is_parallel(false), boundary_order_velocity((int)1)
 	{}
 
 	~VISCOSITY_3D(void)
@@ -230,8 +229,7 @@ public: // Initialization Function
 
 		// Boundary Order for Velocity
 		boundary_order_velocity = script_block.FindBlock("VELOCITY_ADVECTION").GetInteger("boundary_order_velocity", (int)1);
-		periodic_boundary = script_block.GetBoolean("periodic_boundary", (bool)false);
-
+		
 		if (boundary_order_velocity == 1)
 		{
 			cout << "Order of velocity boundary: " << "1" << endl;
@@ -2053,14 +2051,7 @@ public: // Member Functions
 		{
 			if (is_vertical)
 			{
-				if (periodic_boundary)
-				{
-                    scalar_field_ghost.FillGhostCellsPeriodicInYDirection(thread_id, water_levelset.arr, true);
-				}
-				else
-				{
-                    scalar_field_ghost.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_levelset.arr, boundary_levelset.arr, true);
-				}
+				scalar_field_ghost.FillGhostCellsPeriodicInYDirection(thread_id, water_levelset.arr, true);
 
 				GRID_ITERATION_3D(boundary_phi_x.partial_grids[thread_id])
 				{
@@ -2086,14 +2077,7 @@ public: // Member Functions
 
 			if (is_parallel)
 			{
-				if (periodic_boundary)
-				{
-					scalar_field_ghost.FillGhostCellsPeriodicInXDirection(thread_id, water_levelset.arr, true); 
-				}
-				else
-				{
-                    scalar_field_ghost.FillGhostCellsContinuousDerivativesFromXDirectional(thread_id, water_levelset.arr, boundary_levelset.arr, true); 
-				}
+				scalar_field_ghost.FillGhostCellsPeriodicInXDirection(thread_id, water_levelset.arr, true);
 
 				GRID_ITERATION_3D(boundary_phi_x.partial_grids[thread_id])
 				{
@@ -2116,37 +2100,22 @@ public: // Member Functions
 				}
 				multithreading.Sync(thread_id); 
 			}
-            
+
 			if (boundary_order_velocity == 1)
 			{
 				if (is_vertical)
 				{
-					if (periodic_boundary)
-					{
-						velocity_field_mac_ghost_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-						velocity_field_mac_ghost_y.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-						velocity_field_mac_ghost_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+					// Periodic Boundary Condition
+					velocity_field_mac_ghost_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+					velocity_field_mac_ghost_y.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+					velocity_field_mac_ghost_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
 
-						velocity_field_mac_ghost_x_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-						velocity_field_mac_ghost_x_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-						velocity_field_mac_ghost_y_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-						velocity_field_mac_ghost_y_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-						velocity_field_mac_ghost_z_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-						velocity_field_mac_ghost_z_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true); 
-					}
-					else
-					{
-                        velocity_field_mac_ghost_x.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-                        velocity_field_mac_ghost_y.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-                        velocity_field_mac_ghost_z.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-
-                        velocity_field_mac_ghost_x_x.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-					    velocity_field_mac_ghost_x_z.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-					    velocity_field_mac_ghost_y_x.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-					    velocity_field_mac_ghost_y_z.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-					    velocity_field_mac_ghost_z_x.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-					    velocity_field_mac_ghost_z_z.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-					}
+					velocity_field_mac_ghost_x_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+					velocity_field_mac_ghost_x_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+					velocity_field_mac_ghost_y_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+					velocity_field_mac_ghost_y_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+					velocity_field_mac_ghost_z_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+					velocity_field_mac_ghost_z_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
 
 					GRID_ITERATION_3D(boundary_phi_x.partial_grids[thread_id])
 					{
@@ -2265,32 +2234,17 @@ public: // Member Functions
 				}
 				if (is_parallel)
 				{
-					if (periodic_boundary)
-					{
-						velocity_field_mac_ghost_x.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-						velocity_field_mac_ghost_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-						velocity_field_mac_ghost_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+					// Periodic Boundary Condition
+					velocity_field_mac_ghost_x.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+					velocity_field_mac_ghost_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+					velocity_field_mac_ghost_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
 
-						velocity_field_mac_ghost_x_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-						velocity_field_mac_ghost_x_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-						velocity_field_mac_ghost_y_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-						velocity_field_mac_ghost_y_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-						velocity_field_mac_ghost_z_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-						velocity_field_mac_ghost_z_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true); 
-					}
-					else
-					{
-                       velocity_field_mac_ghost_x.FillGhostCellsContinuousDerivativesFromXDirectional(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-					   velocity_field_mac_ghost_y.FillGhostCellsContinuousDerivativesFromXDirectional(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-					   velocity_field_mac_ghost_z.FillGhostCellsContinuousDerivativesFromXDirectional(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-
-					   velocity_field_mac_ghost_x_y.FillGhostCellsContinuousDerivativesFromXDirectional(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-					   velocity_field_mac_ghost_x_z.FillGhostCellsContinuousDerivativesFromXDirectional(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-					   velocity_field_mac_ghost_y_y.FillGhostCellsContinuousDerivativesFromXDirectional(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-					   velocity_field_mac_ghost_y_z.FillGhostCellsContinuousDerivativesFromXDirectional(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-					   velocity_field_mac_ghost_z_y.FillGhostCellsContinuousDerivativesFromXDirectional(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-					   velocity_field_mac_ghost_z_z.FillGhostCellsContinuousDerivativesFromXDirectional(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true); 
-					}
+					velocity_field_mac_ghost_x_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+					velocity_field_mac_ghost_x_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+					velocity_field_mac_ghost_y_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+					velocity_field_mac_ghost_y_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+					velocity_field_mac_ghost_z_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+					velocity_field_mac_ghost_z_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
 
 					GRID_ITERATION_3D(boundary_phi_x.partial_grids[thread_id])
 					{
@@ -2412,32 +2366,17 @@ public: // Member Functions
 		{
 			if (is_vertical)
 			{
-				if (periodic_boundary)
-				{
-					velocity_field_mac_ghost_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-					velocity_field_mac_ghost_y.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-					velocity_field_mac_ghost_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+				// Periodic Boundary Condition
+				velocity_field_mac_ghost_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+				velocity_field_mac_ghost_y.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+				velocity_field_mac_ghost_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
 
-					velocity_field_mac_ghost_x_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-					velocity_field_mac_ghost_x_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-					velocity_field_mac_ghost_y_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-					velocity_field_mac_ghost_y_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-					velocity_field_mac_ghost_z_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-					velocity_field_mac_ghost_z_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true); 
-				}
-				else
-				{
-                    velocity_field_mac_ghost_x.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-                    velocity_field_mac_ghost_y.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-                    velocity_field_mac_ghost_z.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-
-                    velocity_field_mac_ghost_x_x.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-					velocity_field_mac_ghost_x_z.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-					velocity_field_mac_ghost_y_x.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-					velocity_field_mac_ghost_y_z.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-					velocity_field_mac_ghost_z_x.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-					velocity_field_mac_ghost_z_z.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-				}
+				velocity_field_mac_ghost_x_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+				velocity_field_mac_ghost_x_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+				velocity_field_mac_ghost_y_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+				velocity_field_mac_ghost_y_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+				velocity_field_mac_ghost_z_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+				velocity_field_mac_ghost_z_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
 
 				GRID_ITERATION_3D(boundary_phi_x.partial_grids[thread_id])
 				{
@@ -2556,32 +2495,17 @@ public: // Member Functions
 			}
 			if (is_parallel)
 			{
-				if (periodic_boundary)
-				{
-					velocity_field_mac_ghost_x.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-					velocity_field_mac_ghost_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-					velocity_field_mac_ghost_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+				// Periodic Boundary Condition
+				velocity_field_mac_ghost_x.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+				velocity_field_mac_ghost_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+				velocity_field_mac_ghost_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
 
-					velocity_field_mac_ghost_x_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-					velocity_field_mac_ghost_x_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-					velocity_field_mac_ghost_y_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-					velocity_field_mac_ghost_y_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-					velocity_field_mac_ghost_z_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-					velocity_field_mac_ghost_z_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true); 
-				}
-				else
-				{
-                    velocity_field_mac_ghost_x.FillGhostCellsContinuousDerivativesFromXDirectional(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-					velocity_field_mac_ghost_y.FillGhostCellsContinuousDerivativesFromXDirectional(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-					velocity_field_mac_ghost_z.FillGhostCellsContinuousDerivativesFromXDirectional(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-
-					velocity_field_mac_ghost_x_y.FillGhostCellsContinuousDerivativesFromXDirectionalVelocity(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-					velocity_field_mac_ghost_x_z.FillGhostCellsContinuousDerivativesFromXDirectionalVelocity(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-					velocity_field_mac_ghost_y_y.FillGhostCellsContinuousDerivativesFromXDirectionalVelocity(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-					velocity_field_mac_ghost_y_z.FillGhostCellsContinuousDerivativesFromXDirectionalVelocity(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-					velocity_field_mac_ghost_z_y.FillGhostCellsContinuousDerivativesFromXDirectionalVelocity(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-					velocity_field_mac_ghost_z_z.FillGhostCellsContinuousDerivativesFromXDirectionalVelocity(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true); 
-				}
+				velocity_field_mac_ghost_x_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+				velocity_field_mac_ghost_x_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+				velocity_field_mac_ghost_y_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+				velocity_field_mac_ghost_y_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+				velocity_field_mac_ghost_z_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+				velocity_field_mac_ghost_z_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
 
 				GRID_ITERATION_3D(boundary_phi_x.partial_grids[thread_id])
 				{

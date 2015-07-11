@@ -162,7 +162,7 @@ public: // Operator Overloading
 		for(int i = 0; i < num_dimension; i++) values[i] /= s.values[i];
 	}
 
-    VECTOR_ND<TT> operator*(const T& s) const
+	VECTOR_ND<TT> operator*(const T& s) const
 	{
 		VECTOR_ND<TT> Multiply_result(num_dimension);
 		
@@ -190,18 +190,6 @@ public: // Member Functions
 			max_abs = max(abs(values[i]), max_abs);
 		
 		return max_abs;
-	}
-
-    T Sum() const
-	{
-	    T sum(0);
-
-		for (int i = 0; i < num_dimension; i++)
-		{
-            sum += values[i];
-		}
-
-        return sum;
 	}
 };
 

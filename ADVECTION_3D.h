@@ -68,7 +68,6 @@ public: // Options
 	// Options for Boundary Condition
 	bool					levelset_advection, velocity_advection;
 	int						boundary_order_velocity;
-    bool                    periodic_boundary;
 
 public: // Condition variable
 	T						epsilon, epsilon_v;
@@ -84,7 +83,7 @@ public: // Constructor and Desructor
 				 water_signed_distance_field(water_levelset_input.signed_distance_field), pressure_field(0),
 				 air_water_simulation(false), oil_water_simulation(false),
 				 is_vertical(false), is_parallel(false),
-				 boundary_order_velocity((int)1), periodic_boundary(false)
+				 boundary_order_velocity((int)1)
 	{
 		water_signed_distance_field.is_scalar = true;
 		use_5th_weno = false;
@@ -112,7 +111,6 @@ public: // Initialization Function
 		use_3rd_eno_v = advection_block_v.GetBoolean("use_3rd_eno_v", false);
 		epsilon_v = advection_block_v.GetFloat("epsilon", (T)10e-6);
 		boundary_order_velocity = advection_block_v.GetInteger("boundary_order_velocity", (int)1);
-        periodic_boundary = outer_block.GetBoolean("periodic_boundary", false);
 
 		// Display
 		cout << "--------------LEVELSET_ADVECTION--------------" << endl;
@@ -143,15 +141,6 @@ public: // Initialization Function
 			cout << "use 3rd eno: " << "false" << endl;
 		}
 		
-		if (periodic_boundary)
-		{
-            cout << "Periodic boundary condition: " << "true" << endl;
-		}
-		else
-		{
-            cout << "Periodic boundary condition: " << "false" << endl;
-		}
-
 		cout << "epsilon: " << epsilon << endl;
 
 		cout << "--------------VELOCITY_ADVECTION--------------" << endl;
@@ -220,26 +209,18 @@ public: // Member Functions
 
 		if (use_5th_weno)
 		{
-			if (periodic_boundary)
+			if (is_vertical)
 			{
-				if (is_vertical)
-				{
-					scalar_field_ghost.FillGhostCellsPeriodicInYDirection(thread_id, water_signed_distance_field.array_for_this, true);
-					multithreading.Sync(thread_id);
-				}
-
-				if (is_parallel)
-				{
-					scalar_field_ghost.FillGhostCellsPeriodicInXDirection(thread_id, water_signed_distance_field.array_for_this, true);
-					multithreading.Sync(thread_id);
-				} 
-			}
-			else
-			{
-				scalar_field_ghost.FillGhostCellsContinuousDerivativesFrom(thread_id, water_signed_distance_field.array_for_this, true);
-                multithreading.Sync(thread_id);
+				scalar_field_ghost.FillGhostCellsPeriodicInYDirection(thread_id, water_signed_distance_field.array_for_this, true);
+				multithreading.Sync(thread_id);
 			}
 			
+			if (is_parallel)
+			{
+				scalar_field_ghost.FillGhostCellsPeriodicInXDirection(thread_id, water_signed_distance_field.array_for_this, true);
+				multithreading.Sync(thread_id);
+			}
+
 			// Solve for levelset
 			if (air_water_simulation)
 			{
@@ -367,6 +348,9 @@ public: // Member Functions
 					ADVECTION_METHOD_3D<T>::ENO3rd(thread_id, water_velocity_field_mac_y, velocity_field_mac_ghost_y, velocity_field_mac_ghost_y, velocity_field_mac_ghost_y_y, velocity_field_mac_ghost_y_z, boundary_phi_y, velocity_field_mac_ghost_x, velocity_field_mac_ghost_y, velocity_field_mac_ghost_z, dt, multithreading);
 					ADVECTION_METHOD_3D<T>::ENO3rd(thread_id, water_velocity_field_mac_z, velocity_field_mac_ghost_z, velocity_field_mac_ghost_z, velocity_field_mac_ghost_z_y, velocity_field_mac_ghost_z_z, boundary_phi_z, velocity_field_mac_ghost_x, velocity_field_mac_ghost_y, velocity_field_mac_ghost_z, dt, multithreading); 
 				}
+				/*ADVECTION_METHOD_3D<T>::ENO3rd(thread_id, water_velocity_field_mac_x, velocity_field_mac_ghost_x, boundary_phi_x, velocity_field_mac_ghost_x, velocity_field_mac_ghost_y, velocity_field_mac_ghost_z, dt, multithreading);
+				ADVECTION_METHOD_3D<T>::ENO3rd(thread_id, water_velocity_field_mac_y, velocity_field_mac_ghost_y, boundary_phi_y, velocity_field_mac_ghost_x, velocity_field_mac_ghost_y, velocity_field_mac_ghost_z, dt, multithreading);
+				ADVECTION_METHOD_3D<T>::ENO3rd(thread_id, water_velocity_field_mac_z, velocity_field_mac_ghost_z, boundary_phi_z, velocity_field_mac_ghost_x, velocity_field_mac_ghost_y, velocity_field_mac_ghost_z, dt, multithreading);*/
 			} 
 		}
 
@@ -377,34 +361,19 @@ public: // Member Functions
 	{
 		if (oil_water_simulation)
 		{
-			if (periodic_boundary)
+			if (is_vertical)
 			{
-				if (is_vertical)
-				{
-					scalar_field_ghost.FillGhostCellsPeriodicInYDirection(thread_id, water_signed_distance_field.array_for_this, true);
-				}
-				if (is_parallel)
-				{
-					scalar_field_ghost.FillGhostCellsPeriodicInXDirection(thread_id, water_signed_distance_field.array_for_this, true);
-				} 
+				scalar_field_ghost.FillGhostCellsPeriodicInYDirection(thread_id, water_signed_distance_field.array_for_this, true);
 			}
-			else
+			if (is_parallel)
 			{
-				if (is_vertical)
-				{
-                    scalar_field_ghost.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_signed_distance_field.array_for_this, boundary_levelset.arr, true);
-				}
-				if (is_parallel)
-				{
-                    scalar_field_ghost.FillGhostCellsContinuousDerivativesFromXDirectional(thread_id, water_signed_distance_field.array_for_this, boundary_levelset.arr, true);
-				}
+				scalar_field_ghost.FillGhostCellsPeriodicInXDirection(thread_id, water_signed_distance_field.array_for_this, true);
 			}
 		}
 		if (air_water_simulation)
 		{
 			scalar_field_ghost.FillGhostCellsContinuousDerivativesFrom(thread_id, water_signed_distance_field.array_for_this, true);
 		}
-
 		ADVECTION_METHOD_3D<T>::WENO5thReinitialization(thread_id, water_signed_distance_field, scalar_field_ghost, dt, multithreading, epsilon, sign_function);
 	}
 
@@ -418,6 +387,7 @@ public: // Member Functions
 				{
 					T x_coor = boundary_phi_x.x_min + i*boundary_phi_x.dx, z_coor = boundary_phi_x.z_min + k*boundary_phi_x.dz;
 					boundary_phi_x(i, j, k) = sqrt(POW2(x_coor) + POW2(z_coor)) - a;
+					//boundary_phi_x(i, j, k) = (T)0.5*(boundary_levelset(i, j, k) + boundary_levelset(i - 1, j, k));	
 				}
 				multithreading.Sync(thread_id);
 
@@ -425,6 +395,7 @@ public: // Member Functions
 				{
 					T x_coor = boundary_phi_y.x_min + i*boundary_phi_y.dx, z_coor = boundary_phi_y.z_min + k*boundary_phi_y.dz;
 					boundary_phi_y(i, j, k) = sqrt(POW2(x_coor) + POW2(z_coor)) - a;
+					//boundary_phi_y(i, j, k) = (T)0.5*(boundary_levelset(i, j, k) + boundary_levelset(i, j - 1, k));	
 				}
 				multithreading.Sync(thread_id);
 
@@ -432,6 +403,7 @@ public: // Member Functions
 				{
 					T x_coor = boundary_phi_z.x_min + i*boundary_phi_z.dx, z_coor = boundary_phi_z.z_min + k*boundary_phi_z.dz;
 					boundary_phi_z(i, j, k) = sqrt(POW2(x_coor) + POW2(z_coor)) - a;
+					//boundary_phi_z(i, j, k) = (T)0.5*(boundary_levelset(i, j, k) + boundary_levelset(i, j, k - 1));	
 				}
 				multithreading.Sync(thread_id); 
 			}
@@ -441,6 +413,7 @@ public: // Member Functions
 				{
 					T y_coor = boundary_phi_x.y_min + j*boundary_phi_x.dy, z_coor = boundary_phi_x.z_min + k*boundary_phi_x.dz;
 					boundary_phi_x(i, j, k) = sqrt(POW2(y_coor) + POW2(z_coor)) - a;
+					//boundary_phi_x(i, j, k) = (T)0.5*(boundary_levelset(i, j, k) + boundary_levelset(i - 1, j, k));	
 				}
 				multithreading.Sync(thread_id);
 
@@ -448,6 +421,7 @@ public: // Member Functions
 				{
 					T y_coor = boundary_phi_y.y_min + j*boundary_phi_y.dy, z_coor = boundary_phi_y.z_min + k*boundary_phi_y.dz;
 					boundary_phi_y(i, j, k) = sqrt(POW2(y_coor) + POW2(z_coor)) - a;
+					//boundary_phi_y(i, j, k) = (T)0.5*(boundary_levelset(i, j, k) + boundary_levelset(i, j - 1, k));	
 				}
 				multithreading.Sync(thread_id);
 
@@ -455,6 +429,7 @@ public: // Member Functions
 				{
 					T y_coor = boundary_phi_z.y_min + j*boundary_phi_z.dy, z_coor = boundary_phi_z.z_min + k*boundary_phi_z.dz;
 					boundary_phi_z(i, j, k) = sqrt(POW2(y_coor) + POW2(z_coor)) - a;
+					//boundary_phi_z(i, j, k) = (T)0.5*(boundary_levelset(i, j, k) + boundary_levelset(i, j, k - 1));	
 				}
 				multithreading.Sync(thread_id); 
 			}
@@ -463,18 +438,10 @@ public: // Member Functions
 			{
 				if (is_vertical)
 				{
-					if (periodic_boundary)
-					{
-						velocity_field_mac_ghost_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-						velocity_field_mac_ghost_y.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-						velocity_field_mac_ghost_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true); 
-					}
-					else
-					{
-                        velocity_field_mac_ghost_x.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-                        velocity_field_mac_ghost_y.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-                        velocity_field_mac_ghost_z.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-					}
+					// Periodic Boundary Condition
+					velocity_field_mac_ghost_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+					velocity_field_mac_ghost_y.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+					velocity_field_mac_ghost_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
 
 					GRID_ITERATION_3D(boundary_phi_x.partial_grids[thread_id])
 					{
@@ -526,119 +493,58 @@ public: // Member Functions
 				}
 				if (is_parallel)
 				{
-					if (periodic_boundary)
-					{
-						velocity_field_mac_ghost_x.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-						velocity_field_mac_ghost_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-						velocity_field_mac_ghost_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true); 
-					}
-                    else
-					{
-                        velocity_field_mac_ghost_x.FillGhostCellsContinuousDerivativesFromXDirectional(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-                        velocity_field_mac_ghost_y.FillGhostCellsContinuousDerivativesFromXDirectional(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-                        velocity_field_mac_ghost_z.FillGhostCellsContinuousDerivativesFromXDirectional(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-					}
+					// Periodic Boundary Condition
+					velocity_field_mac_ghost_x.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+					velocity_field_mac_ghost_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+					velocity_field_mac_ghost_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
 
-					if (boundary_order_velocity == 1)
+					GRID_ITERATION_3D(boundary_phi_y.partial_grids[thread_id])
 					{
-						GRID_ITERATION_3D(boundary_phi_y.partial_grids[thread_id])
-						{
-							if (boundary_phi_y(i, j, k) > 0)
-							{	
-								water_velocity_field_mac_y(i, j, k) = (T)0;
+						if (boundary_phi_y(i, j, k) > 0)
+						{	
+							water_velocity_field_mac_y(i, j, k) = (T)0;
 
-								if ((boundary_phi_y(i, j - 1, k) > 0) && (boundary_phi_y(i, j + 1, k) > 0) && (boundary_phi_y(i, j, k - 1) > 0) && (boundary_phi_y(i, j, k + 1) > 0))
-								{
-									velocity_field_mac_ghost_y(i, j, k) = (T)0;
-								}
-								if (boundary_phi_y(i, j - 1, k) < 0)
-								{
-									T theta = abs(boundary_phi_y(i, j - 1, k))/(abs(boundary_phi_y(i, j - 1, k)) + abs(boundary_phi_y(i, j, k)));
-									velocity_field_mac_ghost_y(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j - 1, k);
-								}
-								if (boundary_phi_y(i, j + 1, k) < 0)
-								{
-									T theta = abs(boundary_phi_y(i, j + 1, k))/(abs(boundary_phi_y(i, j + 1, k)) + abs(boundary_phi_y(i, j, k)));
-									velocity_field_mac_ghost_y(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j + 1, k);
-								}
+							if ((boundary_phi_y(i, j - 1, k) > 0) && (boundary_phi_y(i, j + 1, k) > 0) && (boundary_phi_y(i, j, k - 1) > 0) && (boundary_phi_y(i, j, k + 1) > 0))
+							{
+								velocity_field_mac_ghost_y(i, j, k) = (T)0;
+							}
+							if (boundary_phi_y(i, j - 1, k) < 0)
+							{
+								T theta = abs(boundary_phi_y(i, j - 1, k))/(abs(boundary_phi_y(i, j - 1, k)) + abs(boundary_phi_y(i, j, k)));
+								velocity_field_mac_ghost_y(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j - 1, k);
+							}
+							if (boundary_phi_y(i, j - 1, k) < 0)
+							{
+								T theta = abs(boundary_phi_y(i, j + 1, k))/(abs(boundary_phi_y(i, j + 1, k)) + abs(boundary_phi_y(i, j, k)));
+								velocity_field_mac_ghost_y(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_y(i, j + 1, k);
 							}
 						}
-						multithreading.Sync(thread_id);
-
-						GRID_ITERATION_3D(boundary_phi_z.partial_grids[thread_id])
-						{
-							if (boundary_phi_z(i, j, k) > 0)
-							{
-								water_velocity_field_mac_z(i, j, k) = (T)0;
-
-								if ((boundary_phi_z(i, j - 1, k) > 0) && (boundary_phi_z(i, j + 1, k) > 0) && (boundary_phi_z(i, j, k - 1) > 0) && (boundary_phi_z(i, j, k + 1) > 0))
-								{
-									velocity_field_mac_ghost_z(i, j, k) = (T)0;
-								}
-								if (boundary_phi_z(i, j, k - 1) < 0)
-								{
-									T theta = abs(boundary_phi_z(i, j, k - 1))/(abs(boundary_phi_z(i, j, k - 1)) + abs(boundary_phi_z(i, j, k)));
-									velocity_field_mac_ghost_z(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k - 1);
-								}
-								if (boundary_phi_z(i, j, k + 1) < 0)
-								{
-									T theta = abs(boundary_phi_z(i, j, k + 1))/(abs(boundary_phi_z(i, j, k + 1)) + abs(boundary_phi_z(i, j, k)));
-									velocity_field_mac_ghost_z(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k + 1);
-								}
-							}	
-						}
-						multithreading.Sync(thread_id);  
 					}
-                    if (boundary_order_velocity == 2)
+					multithreading.Sync(thread_id);
+
+					GRID_ITERATION_3D(boundary_phi_z.partial_grids[thread_id])
 					{
-						GRID_ITERATION_3D(boundary_phi_y.partial_grids[thread_id])
+						if (boundary_phi_z(i, j, k) > 0)
 						{
-							if (boundary_phi_y(i, j, k) > 0)
-							{	
-								water_velocity_field_mac_y(i, j, k) = (T)0;
+							water_velocity_field_mac_z(i, j, k) = (T)0;
 
-								if ((boundary_phi_y(i, j - 1, k) > 0) && (boundary_phi_y(i, j + 1, k) > 0) && (boundary_phi_y(i, j, k - 1) > 0) && (boundary_phi_y(i, j, k + 1) > 0))
-								{
-									velocity_field_mac_ghost_y(i, j, k) = (T)0;
-								}
-								if (boundary_phi_y(i, j - 1, k) < 0)
-								{
-									T theta = abs(boundary_phi_y(i, j - 1, k))/(abs(boundary_phi_y(i, j - 1, k)) + abs(boundary_phi_y(i, j, k)));
-									velocity_field_mac_ghost_y(i, j, k) = (theta - 1)/theta*(2*velocity_field_mac_ghost_y(i, j - 1, k) - velocity_field_mac_ghost_y(i, j - 2, k));
-								}
-								if (boundary_phi_y(i, j + 1, k) < 0)
-								{
-									T theta = abs(boundary_phi_y(i, j + 1, k))/(abs(boundary_phi_y(i, j + 1, k)) + abs(boundary_phi_y(i, j, k)));
-									velocity_field_mac_ghost_y(i, j, k) = (theta - 1)/theta*(2*velocity_field_mac_ghost_y(i, j + 1, k) - velocity_field_mac_ghost_y(i, j + 2, k));
-								}
-							}
-						}
-						multithreading.Sync(thread_id);
-
-						GRID_ITERATION_3D(boundary_phi_z.partial_grids[thread_id])
-						{
-							if (boundary_phi_z(i, j, k) > 0)
+							if ((boundary_phi_z(i, j - 1, k) > 0) && (boundary_phi_z(i, j + 1, k) > 0) && (boundary_phi_z(i, j, k - 1) > 0) && (boundary_phi_z(i, j, k + 1) > 0))
 							{
-								water_velocity_field_mac_z(i, j, k) = (T)0;
-
-								if ((boundary_phi_z(i, j - 1, k) > 0) && (boundary_phi_z(i, j + 1, k) > 0) && (boundary_phi_z(i, j, k - 1) > 0) && (boundary_phi_z(i, j, k + 1) > 0))
-								{
-									velocity_field_mac_ghost_z(i, j, k) = (T)0;
-								}
-								if (boundary_phi_z(i, j, k - 1) < 0)
-								{
-									T theta = abs(boundary_phi_z(i, j, k - 1))/(abs(boundary_phi_z(i, j, k - 1)) + abs(boundary_phi_z(i, j, k)));
-									velocity_field_mac_ghost_z(i, j, k) = (theta - 1)/theta*(2*velocity_field_mac_ghost_z(i, j, k - 1) - velocity_field_mac_ghost_z(i, j, k - 2));
-								}
-								if (boundary_phi_z(i, j, k + 1) < 0)
-								{
-									T theta = abs(boundary_phi_z(i, j, k + 1))/(abs(boundary_phi_z(i, j, k + 1)) + abs(boundary_phi_z(i, j, k)));
-									velocity_field_mac_ghost_z(i, j, k) = (theta - 1)/theta*(2*velocity_field_mac_ghost_z(i, j, k + 1) - velocity_field_mac_ghost_z(i, j, k + 2));
-								}
-							}	
-						}
-						multithreading.Sync(thread_id);  
+								velocity_field_mac_ghost_z(i, j, k) = (T)0;
+							}
+							if (boundary_phi_z(i, j, k - 1) < 0)
+							{
+								T theta = abs(boundary_phi_z(i, j, k - 1))/(abs(boundary_phi_z(i, j, k - 1)) + abs(boundary_phi_z(i, j, k)));
+								velocity_field_mac_ghost_z(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k - 1);
+							}
+							if (boundary_phi_z(i, j, k + 1) < 0)
+							{
+								T theta = abs(boundary_phi_z(i, j, k + 1))/(abs(boundary_phi_z(i, j, k + 1)) + abs(boundary_phi_z(i, j, k)));
+								velocity_field_mac_ghost_z(i, j, k) = (theta - 1)/theta*velocity_field_mac_ghost_z(i, j, k + 1);
+							}
+						}	
 					}
+					multithreading.Sync(thread_id); 
 				}
 			}
 			
@@ -646,32 +552,17 @@ public: // Member Functions
 			{
 				if (is_vertical)
 				{
-					if (periodic_boundary)
-					{
-						velocity_field_mac_ghost_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-						velocity_field_mac_ghost_y.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-						velocity_field_mac_ghost_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+					// Periodic Boundary Condition
+					velocity_field_mac_ghost_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+					velocity_field_mac_ghost_y.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+					velocity_field_mac_ghost_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
 
-						velocity_field_mac_ghost_x_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-						velocity_field_mac_ghost_x_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-						velocity_field_mac_ghost_y_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-						velocity_field_mac_ghost_y_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-						velocity_field_mac_ghost_z_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-						velocity_field_mac_ghost_z_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true); 
-					}
-					else
-					{
-                        velocity_field_mac_ghost_x.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-                        velocity_field_mac_ghost_y.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-                        velocity_field_mac_ghost_z.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-
-                        velocity_field_mac_ghost_x_x.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-						velocity_field_mac_ghost_x_z.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-						velocity_field_mac_ghost_y_x.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-						velocity_field_mac_ghost_y_z.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-						velocity_field_mac_ghost_z_x.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-						velocity_field_mac_ghost_z_z.FillGhostCellsContinuousDerivativesFromYDirectional(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-					}
+					velocity_field_mac_ghost_x_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+					velocity_field_mac_ghost_x_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+					velocity_field_mac_ghost_y_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+					velocity_field_mac_ghost_y_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+					velocity_field_mac_ghost_z_x.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+					velocity_field_mac_ghost_z_z.FillGhostCellsPeriodicInYDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
 
 					GRID_ITERATION_3D(boundary_phi_x.partial_grids[thread_id])
 					{
@@ -682,7 +573,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_x_x(i + t, j, k) = pow(10*t,10); 
+								velocity_field_mac_ghost_x_x(i + t, j, k) = pow(10*t,t); 
 							}
 						}
 						if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i - 1, j, k) > 0)
@@ -692,7 +583,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_x_x(i - t, j, k) = pow(10*t,10);
+								velocity_field_mac_ghost_x_x(i - t, j, k) = pow(10*t,t);
 							}
 						}
 						if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j, k + 1) > 0)
@@ -702,7 +593,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_x_z(i, j, k + t) = pow(10*t,10); 
+								velocity_field_mac_ghost_x_z(i, j, k + t) = pow(10*t,t); 
 							}
 						}
 						if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j, k - 1) > 0)
@@ -712,7 +603,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_x_z(i, j, k - t) = pow(10*t,10); 
+								velocity_field_mac_ghost_x_z(i, j, k - t) = pow(10*t,t); 
 							}
 						}
 					}
@@ -727,7 +618,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_z_x(i + t, j, k) = pow(10*t,10); 
+								velocity_field_mac_ghost_z_x(i + t, j, k) = pow(10*t,t); 
 							}
 						}
 						if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i - 1, j, k) > 0)
@@ -737,7 +628,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_z_x(i - t, j, k) = pow(10*t,10);
+								velocity_field_mac_ghost_z_x(i - t, j, k) = pow(10*t,t);
 							}
 						}
 						if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j, k + 1) > 0)
@@ -747,7 +638,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_z_z(i, j, k + t) = pow(10*t,10); 
+								velocity_field_mac_ghost_z_z(i, j, k + t) = pow(10*t,t); 
 							}
 						}
 						if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j, k - 1) > 0)
@@ -757,7 +648,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_z_z(i, j, k - t) = pow(10*t,10); 
+								velocity_field_mac_ghost_z_z(i, j, k - t) = pow(10*t,t); 
 							}
 						}
 					}
@@ -772,7 +663,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_y_x(i + t, j, k) = pow(10*t,10); 
+								velocity_field_mac_ghost_y_x(i + t, j, k) = pow(10*t,t); 
 							}
 						}
 						if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i - 1, j, k) > 0)
@@ -782,7 +673,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_y_x(i - t, j, k) = pow(10*t,10);
+								velocity_field_mac_ghost_y_x(i - t, j, k) = pow(10*t,t);
 							}
 						}
 						if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j, k + 1) > 0)
@@ -792,7 +683,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_y_z(i, j, k + t) = pow(10*t,10); 
+								velocity_field_mac_ghost_y_z(i, j, k + t) = pow(10*t,t); 
 							}
 						}
 						if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j, k - 1) > 0)
@@ -802,7 +693,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_y_z(i, j, k - t) = pow(10*t,10); 
+								velocity_field_mac_ghost_y_z(i, j, k - t) = pow(10*t,t); 
 							}
 						}
 					}
@@ -810,32 +701,17 @@ public: // Member Functions
 				}
 				if (is_parallel)
 				{
-					if (periodic_boundary)
-					{
-						velocity_field_mac_ghost_x.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-						velocity_field_mac_ghost_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-						velocity_field_mac_ghost_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+					// Periodic Boundary Condition
+					velocity_field_mac_ghost_x.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+					velocity_field_mac_ghost_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+					velocity_field_mac_ghost_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
 
-						velocity_field_mac_ghost_x_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-						velocity_field_mac_ghost_x_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-						velocity_field_mac_ghost_y_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-						velocity_field_mac_ghost_y_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-						velocity_field_mac_ghost_z_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-						velocity_field_mac_ghost_z_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true); 
-					}
-					else
-					{
-                        velocity_field_mac_ghost_x.FillGhostCellsContinuousDerivativesFromXDirectionalVelocity(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-						velocity_field_mac_ghost_y.FillGhostCellsContinuousDerivativesFromXDirectionalVelocity(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-						velocity_field_mac_ghost_z.FillGhostCellsContinuousDerivativesFromXDirectionalVelocity(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-
-						velocity_field_mac_ghost_x_y.FillGhostCellsContinuousDerivativesFromXDirectionalVelocity(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-						velocity_field_mac_ghost_x_z.FillGhostCellsContinuousDerivativesFromXDirectionalVelocity(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
-						velocity_field_mac_ghost_y_y.FillGhostCellsContinuousDerivativesFromXDirectionalVelocity(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-						velocity_field_mac_ghost_y_z.FillGhostCellsContinuousDerivativesFromXDirectionalVelocity(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
-						velocity_field_mac_ghost_z_y.FillGhostCellsContinuousDerivativesFromXDirectionalVelocity(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
-						velocity_field_mac_ghost_z_z.FillGhostCellsContinuousDerivativesFromXDirectionalVelocity(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true); 
-					}
+					velocity_field_mac_ghost_x_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+					velocity_field_mac_ghost_x_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_x.array_for_this, boundary_phi_x.array_for_this, true);
+					velocity_field_mac_ghost_y_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+					velocity_field_mac_ghost_y_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_y.array_for_this, boundary_phi_y.array_for_this, true);
+					velocity_field_mac_ghost_z_y.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
+					velocity_field_mac_ghost_z_z.FillGhostCellsPeriodicInXDirection(thread_id, water_velocity_field_mac_z.array_for_this, boundary_phi_z.array_for_this, true);
 
 					if (boundary_order_velocity == 1)
 					{
@@ -848,7 +724,7 @@ public: // Member Functions
 
 								for (int t = 2; t <= 4 ; t++)
 								{
-									velocity_field_mac_ghost_x_y(i, j + t, k) = pow(10*t,10); 
+									velocity_field_mac_ghost_x_y(i, j + t, k) = pow(10*t,t); 
 								}
 							}
 							if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j - 1, k) > 0)
@@ -858,7 +734,7 @@ public: // Member Functions
 
 								for (int t = 2; t <= 4 ; t++)
 								{
-									velocity_field_mac_ghost_x_y(i, j - t, k) = pow(10*t,10);
+									velocity_field_mac_ghost_x_y(i, j - t, k) = pow(10*t,t);
 								}
 							}
 							if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j, k + 1) > 0)
@@ -868,7 +744,7 @@ public: // Member Functions
 
 								for (int t = 2; t <= 4 ; t++)
 								{
-									velocity_field_mac_ghost_x_z(i, j, k + t) = pow(10*t,10); 
+									velocity_field_mac_ghost_x_z(i, j, k + t) = pow(10*t,t); 
 								}
 							}
 							if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j, k - 1) > 0)
@@ -878,7 +754,7 @@ public: // Member Functions
 
 								for (int t = 2; t <= 4 ; t++)
 								{
-									velocity_field_mac_ghost_x_z(i, j, k - t) = pow(10*t,10); 
+									velocity_field_mac_ghost_x_z(i, j, k - t) = pow(10*t,t); 
 								}
 							}
 						}
@@ -893,7 +769,7 @@ public: // Member Functions
 
 								for (int t = 2; t <= 4 ; t++)
 								{
-									velocity_field_mac_ghost_z_y(i, j + t, k) = pow(10*t,10); 
+									velocity_field_mac_ghost_z_y(i, j + t, k) = pow(10*t,t); 
 								}
 							}
 							if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j - 1, k) > 0)
@@ -903,7 +779,7 @@ public: // Member Functions
 
 								for (int t = 2; t <= 4 ; t++)
 								{
-									velocity_field_mac_ghost_z_y(i, j - t, k) = pow(10*t,10);
+									velocity_field_mac_ghost_z_y(i, j - t, k) = pow(10*t,t);
 								}
 							}
 							if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j, k + 1) > 0)
@@ -913,7 +789,7 @@ public: // Member Functions
 
 								for (int t = 2; t <= 4 ; t++)
 								{
-									velocity_field_mac_ghost_z_z(i, j, k + t) = pow(10*t,10); 
+									velocity_field_mac_ghost_z_z(i, j, k + t) = pow(10*t,t); 
 								}
 							}
 							if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j, k - 1) > 0)
@@ -923,7 +799,7 @@ public: // Member Functions
 
 								for (int t = 2; t <= 4 ; t++)
 								{
-									velocity_field_mac_ghost_z_z(i, j, k - t) = pow(10*t,10); 
+									velocity_field_mac_ghost_z_z(i, j, k - t) = pow(10*t,t); 
 								}
 							}
 						}
@@ -938,7 +814,7 @@ public: // Member Functions
 
 								for (int t = 2; t <= 4 ; t++)
 								{
-									velocity_field_mac_ghost_y_y(i, j + t, k) = pow(10*t,10); 
+									velocity_field_mac_ghost_y_y(i, j + t, k) = pow(10*t,t); 
 								}
 							}
 							if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j - 1, k) > 0)
@@ -948,7 +824,7 @@ public: // Member Functions
 
 								for (int t = 2; t <= 4 ; t++)
 								{
-									velocity_field_mac_ghost_y_y(i, j - t, k) = pow(10*t,10);
+									velocity_field_mac_ghost_y_y(i, j - t, k) = pow(10*t,t);
 								}
 							}
 							if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j, k + 1) > 0)
@@ -958,7 +834,7 @@ public: // Member Functions
 
 								for (int t = 2; t <= 4 ; t++)
 								{
-									velocity_field_mac_ghost_y_z(i, j, k + t) = pow(10*t,10); 
+									velocity_field_mac_ghost_y_z(i, j, k + t) = pow(10*t,t); 
 								}
 							}
 							if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j, k - 1) > 0)
@@ -968,7 +844,7 @@ public: // Member Functions
 
 								for (int t = 2; t <= 4 ; t++)
 								{
-									velocity_field_mac_ghost_y_z(i, j, k - t) = pow(10*t,10); 
+									velocity_field_mac_ghost_y_z(i, j, k - t) = pow(10*t,t); 
 								}
 							}
 						}
@@ -986,7 +862,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_x_y(i, j + t, k) = pow(10*t,10); 
+								velocity_field_mac_ghost_x_y(i, j + t, k) = pow(10*t,t); 
 							}
 						}
 						if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j - 1, k) > 0)
@@ -996,7 +872,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_x_y(i, j - t, k) = pow(10*t,10);
+								velocity_field_mac_ghost_x_y(i, j - t, k) = pow(10*t,t);
 							}
 						}
 						if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j, k + 1) > 0)
@@ -1006,7 +882,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_x_z(i, j, k + t) = pow(10*t,10); 
+								velocity_field_mac_ghost_x_z(i, j, k + t) = pow(10*t,t); 
 							}
 						}
 						if (boundary_phi_x(i, j, k) < 0 && boundary_phi_x(i, j, k - 1) > 0)
@@ -1016,7 +892,7 @@ public: // Member Functions
 							
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_x_z(i, j, k - t) = pow(10*t,10); 
+								velocity_field_mac_ghost_x_z(i, j, k - t) = pow(10*t,t); 
 							}
 						}
 					}
@@ -1031,7 +907,7 @@ public: // Member Functions
 							
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_z_y(i, j + t, k) = pow(10*t,10); 
+								velocity_field_mac_ghost_z_y(i, j + t, k) = pow(10*t,t); 
 							}
 						}
 						if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j - 1, k) > 0)
@@ -1041,7 +917,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_z_y(i, j - t, k) = pow(10*t,10);
+								velocity_field_mac_ghost_z_y(i, j - t, k) = pow(10*t,t);
 							}
 						}
 						if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j, k + 1) > 0)
@@ -1051,7 +927,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_z_z(i, j, k + t) = pow(10*t,10); 
+								velocity_field_mac_ghost_z_z(i, j, k + t) = pow(10*t,t); 
 							}
 						}
 						if (boundary_phi_z(i, j, k) < 0 && boundary_phi_z(i, j, k - 1) > 0)
@@ -1061,7 +937,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_z_z(i, j, k - t) = pow(10*t,10); 
+								velocity_field_mac_ghost_z_z(i, j, k - t) = pow(10*t,t); 
 							}
 						}
 					}
@@ -1076,7 +952,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_y_y(i, j + t, k) = pow(10*t,10); 
+								velocity_field_mac_ghost_y_y(i, j + t, k) = pow(10*t,t); 
 							}
 						}
 						if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j - 1, k) > 0)
@@ -1086,7 +962,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_y_y(i, j - t, k) = pow(10*t,10);
+								velocity_field_mac_ghost_y_y(i, j - t, k) = pow(10*t,t);
 							}
 						}
 						if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j, k + 1) > 0)
@@ -1096,7 +972,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_y_z(i, j, k + t) = pow(10*t,10); 
+								velocity_field_mac_ghost_y_z(i, j, k + t) = pow(10*t,t); 
 							}
 						}
 						if (boundary_phi_y(i, j, k) < 0 && boundary_phi_y(i, j, k - 1) > 0)
@@ -1106,7 +982,7 @@ public: // Member Functions
 
 							for (int t = 2; t <= 4 ; t++)
 							{
-								velocity_field_mac_ghost_y_z(i, j, k - t) = pow(10*t,10); 
+								velocity_field_mac_ghost_y_z(i, j, k - t) = pow(10*t,t); 
 							}
 						}
 					}

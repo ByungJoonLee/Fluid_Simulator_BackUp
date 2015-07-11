@@ -509,8 +509,8 @@ public: // Initialization Functions
 				V0 = (f + water_density*g)*POW2(R1)/((T)4*water_viscosity)*A;
 				J = surface_tension*R1*oil_density/POW2(oil_viscosity);
 				//J = fluid_solver_block.GetFloat("J", (T)1);
-				//Re = (oil_density*R1*abs(V0))/oil_viscosity;
-				Re = fluid_solver_block.GetFloat("Re", (T)1.0);
+				Re = (oil_density*R1*abs(V0))/oil_viscosity;
+				//Re = fluid_solver_block.GetFloat("Re", (T)1.0);
 				//V0 = Re*oil_viscosity/(oil_density*R1);
 				We = ((T)1/J)*POW2(Re);
 				//We = 11.3221;
@@ -677,7 +677,6 @@ public: // Initialization Functions
 				water_projection->air_density = air_density;
 				water_projection->surface_tension = fluid_solver_block.GetFloat("surface_tension", (T)1);
 				water_projection->use_delta_function_formulation = use_delta_function_formulation;
-                water_projection->periodic_boundary = fluid_solver_block.GetBoolean("periodic_boundary", (bool)false);
 			}
 			if (oil_water_simulation)
 			{
@@ -685,7 +684,6 @@ public: // Initialization Functions
 				water_projection->oil_water_simulation = true;
 				water_projection->InitializeFromBlock(fluid_solver_block.FindBlock("PROJECTION_WATER"));
 				water_projection->a = a;
-                water_projection->periodic_boundary = fluid_solver_block.GetBoolean("periodic_boundary", (bool)false);
 
 				if (dimensionless_form)
 				{
@@ -805,34 +803,6 @@ public: // Advancing
 	void AdvanceOneTimeStepThread(const int& thread_id, const T& dt)
 	{
 		ofstream fout;
-        
-        /*int ghost_width_x;
-		ghost_width_x = water_velocity_field_mac_x->ghost_width;
-
-		for (int k = k_start_x - ghost_width_x; k <= k_end_x + ghost_width_x; k++)
-		{
-			for (int j = j_start_x - ghost_width_x; j <= j_end_x + ghost_width_x; j++)
-			{
-				for (int i = i_end_x; i <= i_end_x + ghost_width_x; i++)
-				{
-					T x_coor = water_velocity_field_mac_x->grid.x_min + i*water_velocity_field_mac_x->grid.dx, y_coor = water_velocity_field_mac_x->grid.y_min + j*water_velocity_field_mac_x->grid.dy, z_coor = water_velocity_field_mac_x->grid.z_min + k*water_velocity_field_mac_x->grid.dz;
-					T magnitude = sqrt(POW2(y_coor) + POW2(z_coor));
-					if ((magnitude >= 1) && (magnitude <= a))
-					{
-						water_velocity_field_mac_x->array_for_this(i, j, k) = (T)1/A*(POW2(a) - (POW2(y_coor) + POW2(z_coor)) - (T)2*(K - 1)*log(sqrt(POW2(y_coor) + POW2(z_coor))/a));
-					}								
-					else if (magnitude < 1)
-					{
-						water_velocity_field_mac_x->array_for_this(i, j, k) = (T)1 - (T)1/A*(m*(POW2(y_coor) + POW2(z_coor))*K);
-					}
-					else
-					{
-						water_velocity_field_mac_x->array_for_this(i, j, k) = (T)0;
-					}
-				}
-			}
-		}*/
-	
 		if (order_for_time_advancing == 1)
 		{
 			//Solve(thread_id, dt);
@@ -1505,7 +1475,7 @@ public: // Advancing
 			Projection(thread_id, dt);
 		}
         
-		/*if (is_vertical)
+		if (is_vertical)
 		{
 			fout.open("velocity_x_after_projection");
 			for (int i = water_velocity_field_mac_x->i_start; i <= water_velocity_field_mac_x->i_end; i++)
@@ -1613,7 +1583,7 @@ public: // Advancing
 				}
 				fout.close();  
 			}
-		}*/
+		}
 	}
 	
 public: // Simulation steps
