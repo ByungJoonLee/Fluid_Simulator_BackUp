@@ -62,12 +62,9 @@ public: // Properties of Simulation
 public: // Boundary Condition
 	bool								Dirichlet_Boundary_Condition, Neumann_Boundary_Condition;
 
-public: // For Neumann Boundary Condition
-	bool								one_point_fixed, projecting_space_without_null;
-
 public: // Constructors and Destructor
 	POISSON_SOLVER_3D(void)
-		: tolerance((T)1e-4), sqr_tolerance(tolerance*tolerance), max_iteration(100), multithreading(0), linear_solver(0), num_levels(0), use_variable_density(false), place_dirichlet_bc_at_face(true), num_smoother_id(0), air_water_simulation(false), oil_water_simulation(false), one_point_fixed(false), projecting_space_without_null(false)
+		: tolerance((T)1e-4), sqr_tolerance(tolerance*tolerance), max_iteration(100), multithreading(0), linear_solver(0), num_levels(0), use_variable_density(false), place_dirichlet_bc_at_face(true), num_smoother_id(0), air_water_simulation(false), oil_water_simulation(false)
 	{}
 
 	~POISSON_SOLVER_3D(void)
@@ -1460,65 +1457,35 @@ public: // Member Functions
 				}
 				
 				// Tuning the given matrix into the invertiable matrix -- "On deflation and singular symmetric positive semi-definite matrices -- J.M.Tang, C.Vuik"
-				if (one_point_fixed)
+				if ((thread_id == 0) && (i == i_start_for_domain) && (j == j_start_for_domain) && (k == k_start_for_domain))
 				{
-					if ((thread_id == 0) && (i == i_start_for_domain) && (j == j_start_for_domain) && (k == k_start_for_domain))
+					if (bc(i - 1, j, k) == BC_NEUM)
 					{
-						if (bc(i - 1, j, k) == BC_NEUM)
-						{
-							coef_ijk += 0;
-						}
-						if (bc(i + 1, j, k) == BC_NEUM)
-						{
-							coef_ijk += 0;
-						}
-						if (bc(i, j - 1, k) == BC_NEUM)
-						{
-							coef_ijk += 0;
-						}
-						if (bc(i, j + 1, k) == BC_NEUM)
-						{
-							coef_ijk += 0;
-						}
-						if (bc(i, j, k - 1) == BC_NEUM)
-						{
-							coef_ijk += beta_d;
-							//coef_ijk += 0;
-						}
-						if (bc(i, j, k + 1) == BC_NEUM)
-						{
-							coef_ijk += 0;
-						}
+						coef_ijk += 0;
 					}
-					else
+					if (bc(i + 1, j, k) == BC_NEUM)
 					{
-						if (bc(i - 1, j, k) == BC_NEUM)
-						{
-							coef_ijk += 0;
-						}
-						if (bc(i + 1, j, k) == BC_NEUM)
-						{
-							coef_ijk += 0;
-						}
-						if (bc(i, j - 1, k) == BC_NEUM)
-						{
-							coef_ijk += 0;
-						}
-						if (bc(i, j + 1, k) == BC_NEUM)
-						{
-							coef_ijk += 0;
-						}
-						if (bc(i, j, k - 1) == BC_NEUM)
-						{
-							coef_ijk += 0;
-						}
-						if (bc(i, j, k + 1) == BC_NEUM)
-						{
-							coef_ijk += 0;
-						}
-					} 
+						coef_ijk += 0;
+					}
+					if (bc(i, j - 1, k) == BC_NEUM)
+					{
+						coef_ijk += 0;
+					}
+					if (bc(i, j + 1, k) == BC_NEUM)
+					{
+						coef_ijk += 0;
+					}
+					if (bc(i, j, k - 1) == BC_NEUM)
+					{
+						coef_ijk += beta_d;
+						//coef_ijk += 0;
+					}
+					if (bc(i, j, k + 1) == BC_NEUM)
+					{
+						coef_ijk += 0;
+					}
 				}
-				if (projecting_space_without_null)
+				else
 				{
 					if (bc(i - 1, j, k) == BC_NEUM)
 					{

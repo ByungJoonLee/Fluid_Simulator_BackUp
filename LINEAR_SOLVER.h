@@ -15,12 +15,10 @@ public: // Essential Data
 	MULTITHREADING*	multithreading;
 
 	static bool		use_detailed_log;				// temporary for debug
-   
-    bool            one_point_fixed, projecting_space_without_null; // For PCG
 
 public: // Constructors and Destructor
 	LINEAR_SOLVER(void)
-		: tolerance((T)1), sqr_tolerance(tolerance*tolerance), residual((T)1e8), max_iteration(10), num_iteration(0), multithreading(0), one_point_fixed(false), projecting_space_without_null(false)
+		: tolerance((T)1), sqr_tolerance(tolerance*tolerance), residual((T)1e8), max_iteration(10), num_iteration(0), multithreading(0)
 	{}
 
 	~LINEAR_SOLVER(void)

@@ -14,8 +14,6 @@ public: // Using Keyword
 	using BASE::residual;
 	using BASE::max_iteration;
 	using BASE::num_iteration;
-    using BASE::one_point_fixed;
-    using BASE::projecting_space_without_null;
 
 public: // Essential Data
 	VECTOR_ND<T> res, p, Ap, s;
@@ -40,19 +38,10 @@ public: // Initialization Function
 public: // Solver
 	void Solve(const int& thread_id, const CSR_MATRIX<T>& A, VECTOR_ND<T>& x, const VECTOR_ND<T>& b, const FIELD_STRUCTURE_3D<int>& bc)
 	{
-		if (projecting_space_without_null)
-		{
-            PCGMethodProjected(thread_id, bc.grid.i_res, bc.grid.j_res, bc.grid.k_res, A, x, b);
-		}
-		else
-		{
-            PCGMethod(thread_id, bc.grid.i_res, bc.grid.j_res, bc.grid.k_res, A, x, b);
-		}
+		PCGMethod(thread_id, bc.grid.i_res, bc.grid.j_res, bc.grid.k_res, A, x, b);
 	}
 
-    void PCGMethod(const int& thread_id, const int& i_res_input, const int& j_res_input, const int& k_res_input, const CSR_MATRIX<T>& A, VECTOR_ND<T>& x, const VECTOR_ND<T>& b);
-	void PCGMethodProjected(const int & thread_id, const int& i_res_input, const int& j_res_input, const int& k_res_input, const CSR_MATRIX<T>& A, VECTOR_ND<T>& x, const VECTOR_ND<T>& b);
+	void PCGMethod(const int& thread_id, const int& i_res_input, const int& j_res_input, const int& k_res_input, const CSR_MATRIX<T>& A, VECTOR_ND<T>& x, const VECTOR_ND<T>& b);
 	void MultiplicationByMinverseAsDiagonal(const int& thread_id, const CSR_MATRIX<T>& A, VECTOR_ND<T>& x, const VECTOR_ND<T>& b);
-	void MultiplicationByMinverseAsDiagonalProjected(const int& thread_id, const CSR_MATRIX<T>& A, VECTOR_ND<T>& x, const VECTOR_ND<T>& b, const T& constant_value);
 	void MultiplicationByMinverse(const int& thread_id, const CSR_MATRIX<T>& M, VECTOR_ND<T>& x, const VECTOR_ND<T>& b);
 };

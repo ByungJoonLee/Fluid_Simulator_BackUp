@@ -3,15 +3,13 @@
 enum	POISSON_SOLVER_TYPE                                     {NO_SOLVER, MULTIGRID, CG, PCG, HYBRID, GS};
 enum	SMOOTHER_TYPE											{NO_SMOOTHER, GS_SMOOTHER, NB_GS_SMOOTHER, WEIGHTED_JACOBI_SMOOTHER};
 
-// Boundary Cell Property
-#define BC_FULL		 0
+#define BC_FULL		0
 #define BC_DIR		-1
 #define BC_OBJ		-2
 #define BC_NULL		-3
 #define BC_NEUM		-4
 #define BC_PER		-5
 #define BC_OTHER	-6
-
 #define PI														(T)3.14159265358979323846
 
 #define ABS(a)													((a) > 0 ? (a) : -(a))

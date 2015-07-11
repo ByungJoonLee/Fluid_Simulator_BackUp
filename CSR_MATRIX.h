@@ -581,53 +581,5 @@ static void DiagonalPreconditioner(MULTITHREADING* multithreading, const int& th
 	multithreading->Sync(thread_id);
 }
 
-template<class TT>
-static void DiagonalPreconditionerProjected(MULTITHREADING* multithreading, const int& thread_id, const CSR_MATRIX<TT>& A, CSR_MATRIX<TT>& D, const TT& constant_value)
-{
-	const int N = A.N;
-
-	BEGIN_HEAD_THREAD_WORK
-	{
-		D.Initialize(multithreading, N, N);
-		
-		multithreading->SplitDomainIndex1D(0, D.N);
-		
-		D.start_ix[0] = 0;
-		D.end_ix[0] = multithreading->sync_value_int[0] - 1;
-		D.prev_row_array[0] = -1;
-		D.values_ix_array[0] = 0;
-		for (int id = 1; id < multithreading->num_threads; id++)
-		{
-			D.start_ix[id] = D.end_ix[id - 1] + 1;
-			D.end_ix[id] = D.end_ix[id - 1] + multithreading->sync_value_int[id];
-			D.prev_row_array[id] = -1;
-			D.values_ix_array[id] = D.start_ix[id];
-		}
-	}
-	END_HEAD_THREAD_WORK;
-
-	const int start_ix(multithreading->start_ix_1D[thread_id]), end_ix(multithreading->end_ix_1D[thread_id]);
-
-	for (int i = start_ix; i <= end_ix; i++)
-	{
-		D.row_ptr[i] = i;
-	}
-	multithreading->Sync(thread_id);
-
-	for (int i = start_ix; i <= end_ix; i++)
-	{
-		for (int vix = D.row_ptr[i]; vix < D.row_ptr[i + 1]; vix++)
-		{
-			D.column_index[vix] = vix;
-		}
-	}
-	multithreading->Sync(thread_id);
-
-	for (int i = start_ix; i <= end_ix; i++)
-	{
-		D(i, i) = A(i, i) + constant_value;
-	}
-	multithreading->Sync(thread_id);
-}
 
 

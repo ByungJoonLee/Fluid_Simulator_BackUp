@@ -50,7 +50,7 @@ public: // For drawing
 public: // Constructors and Destructor
 	LEVELSET_3D(void)
 		: grid(signed_distance_field.grid), partial_grids(signed_distance_field.partial_grids), partial_grids_ghost(signed_distance_field.partial_grids_ghost), ghost_width(signed_distance_field.ghost_width),
-		 phi(signed_distance_field.array_for_this), arr(signed_distance_field.array_for_this), sweep_direction(0), max_abs_value(0), abs_max_curvature(0), periodic_num_x((int)1), periodic_num_y((int)1)
+		 phi(signed_distance_field.array_for_this), arr(signed_distance_field.array_for_this), sweep_direction(0), max_abs_value(0), abs_max_curvature(0), is_periodic(false), periodic_num_x((int)1), periodic_num_y((int)1)
 	{}
 
 	~LEVELSET_3D(void)
