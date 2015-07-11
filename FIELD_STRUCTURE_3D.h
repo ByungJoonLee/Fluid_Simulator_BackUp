@@ -1773,6 +1773,283 @@ public: // Speedup Functions
 		multithreading->Sync(thread_id);
 	}
 
+	void FillGhostCellsContinuousDerivativesFromYDirectional(const int& thread_id, ARRAY_3D<TT>& phi_real, ARRAY_3D<TT>& boundary_levelset, const bool& copy_real_data)
+	{
+		int i, j, k;
+
+		// Fill real region
+		if(copy_real_data)
+		{
+			const int i_start(partial_grids[thread_id].i_start), j_start(partial_grids[thread_id].j_start), k_start(partial_grids[thread_id].k_start),
+					  i_end(partial_grids[thread_id].i_end), j_end(partial_grids[thread_id].j_end), k_end(partial_grids[thread_id].k_end);
+
+			for(k = k_start; k <= k_end; k++)
+			{
+				for(j = j_start; j <= j_end; j++)
+				{
+					for(i = i_start; i <= i_end; i++)
+					{
+						array_for_this(i, j, k) = phi_real(i, j, k);
+					}
+				}
+			}
+		}
+
+		if (ghost_width == 0)
+		{
+			multithreading->Sync(thread_id);
+			return;
+		}
+
+		// Fill ghost region
+		const int i_start(grid.i_start), j_start(grid.j_start), k_start(grid.k_start), i_end(grid.i_end), j_end(grid.j_end), k_end(grid.k_end);
+		const int num_threads(partial_grids.num_elements);
+
+		// Face bottom
+		if(0 % num_threads == thread_id)
+		{
+			for(k = k_start; k <= k_end; k++)
+			{
+				for(j = j_start - 1; j >= j_start - ghost_width; j--)
+				{
+					for(i = i_start; i <= i_end; i++)
+					{
+						if (boundary_levelset(i, j, k) < (double)1e-8)
+						{
+							//array_for_this(i, j, k) = (T)2*phi_real(i, j + 1, k) - phi_real(i, j + 2, k); 
+							if (phi_real(i, j + 1, k) <= (T)0)
+							{
+								array_for_this(i, j, k) = phi_real(i, j + 1, k) - abs(phi_real(i, j + 1, k) - phi_real(i, j + 2, k)); 
+							}
+							else
+							{
+								array_for_this(i, j, k) = phi_real(i, j + 1, k) + abs(phi_real(i, j + 1, k) - phi_real(i, j + 2, k)); 
+							}
+						}
+						else
+						{
+							continue;
+						}
+					}
+				}
+			}
+		}
+
+		// Face up
+		if(1 % num_threads == thread_id)
+		{
+			for(k = k_start; k <= k_end; k++)
+			{
+				for(j = j_end + 1; j <= j_end + ghost_width; j++)
+				{
+					for(i = i_start; i <= i_end; i++)
+					{
+						if (boundary_levelset(i, j, k) < (double)1e-8)
+						{
+							if (phi_real(i, j - 1, k) <= (T)0)
+							{
+								array_for_this(i, j, k) = phi_real(i, j - 1, k) - abs(phi_real(i, j - 1, k) - phi_real(i, j - 2, k));
+							}
+							else
+							{
+								array_for_this(i, j, k) = phi_real(i, j - 1, k) + abs(phi_real(i, j - 1, k) - phi_real(i, j - 2, k));
+							}
+							//array_for_this(i, j, k) = (T)2*phi_real(i, j - 1, k) - phi_real(i, j - 2, k); 
+						}
+						else
+						{
+							continue;
+						}
+					}
+				}
+			}
+		}
+
+		multithreading->Sync(thread_id);
+	}
+
+	void FillGhostCellsContinuousDerivativesFromXDirectionalVelocity(const int& thread_id, ARRAY_3D<TT>& phi_real, ARRAY_3D<TT>& boundary_levelset, const bool& copy_real_data)
+	{
+		int i, j, k;
+
+		// Fill real region
+		if(copy_real_data)
+		{
+			const int i_start(partial_grids[thread_id].i_start), j_start(partial_grids[thread_id].j_start), k_start(partial_grids[thread_id].k_start),
+					  i_end(partial_grids[thread_id].i_end), j_end(partial_grids[thread_id].j_end), k_end(partial_grids[thread_id].k_end);
+
+			for(k = k_start; k <= k_end; k++)
+			{
+				for(j = j_start; j <= j_end; j++)
+				{
+					for(i = i_start; i <= i_end; i++)
+					{
+						array_for_this(i, j, k) = phi_real(i, j, k);
+					}
+				}
+			}
+		}
+
+		if (ghost_width == 0)
+		{
+			multithreading->Sync(thread_id);
+			return;
+		}
+
+		// Fill ghost region
+		const int i_start(grid.i_start), j_start(grid.j_start), k_start(grid.k_start), i_end(grid.i_end), j_end(grid.j_end), k_end(grid.k_end);
+		const int num_threads(partial_grids.num_elements);
+		
+		// Face left
+		if(0 % num_threads == thread_id)
+		{
+			for(k = k_start; k <= k_end; k++)
+			{
+				for(j = j_start; j <= j_end; j++)
+				{
+					for(i = i_start - 1; i >= i_start - ghost_width; i--)
+					{
+						if (boundary_levelset(i, j, k) < (double)1e-8)
+						{
+							array_for_this(i, j, k) = (T)2*phi_real(i + 1, j, k) - phi_real(i + 2, j, k); 
+						}
+						else
+						{
+							continue;
+						}
+					}
+				}
+			}
+		}
+
+		// Face right
+		if(1 % num_threads == thread_id)
+		{
+			for(k = k_start; k <= k_end; k++)
+			{
+				for(j = j_start; j <= j_end; j++)
+				{
+					for(i = i_end + 1; i <= i_end + ghost_width; i++)
+					{
+						if (boundary_levelset(i, j, k) < (double)1e-8)
+						{
+							/*if (phi_real(i - 1, j, k) <= (T)0)
+							{
+								array_for_this(i, j, k) = phi_real(i - 1, j, k) - abs(phi_real(i - 1, j, k) - phi_real(i - 2, j, k));
+							}
+							else
+							{
+								array_for_this(i, j, k) = phi_real(i - 1, j, k) + abs(phi_real(i - 1, j, k) - phi_real(i - 2, j, k));
+							}*/
+							array_for_this(i, j, k) = (T)2*phi_real(i - 1, j, k) - phi_real(i - 2, j, k); 
+						}
+						else
+						{
+							continue;
+						}
+					}
+				}
+			}
+		}
+
+		multithreading->Sync(thread_id);
+	}
+
+	void FillGhostCellsContinuousDerivativesFromXDirectional(const int& thread_id, ARRAY_3D<TT>& phi_real, ARRAY_3D<TT>& boundary_levelset, const bool& copy_real_data)
+	{
+		int i, j, k;
+
+		// Fill real region
+		if(copy_real_data)
+		{
+			const int i_start(partial_grids[thread_id].i_start), j_start(partial_grids[thread_id].j_start), k_start(partial_grids[thread_id].k_start),
+					  i_end(partial_grids[thread_id].i_end), j_end(partial_grids[thread_id].j_end), k_end(partial_grids[thread_id].k_end);
+
+			for(k = k_start; k <= k_end; k++)
+			{
+				for(j = j_start; j <= j_end; j++)
+				{
+					for(i = i_start; i <= i_end; i++)
+					{
+						array_for_this(i, j, k) = phi_real(i, j, k);
+					}
+				}
+			}
+		}
+
+		if (ghost_width == 0)
+		{
+			multithreading->Sync(thread_id);
+			return;
+		}
+
+		// Fill ghost region
+		const int i_start(grid.i_start), j_start(grid.j_start), k_start(grid.k_start), i_end(grid.i_end), j_end(grid.j_end), k_end(grid.k_end);
+		const int num_threads(partial_grids.num_elements);
+		
+		// Face left
+		if(0 % num_threads == thread_id)
+		{
+			for(k = k_start; k <= k_end; k++)
+			{
+				for(j = j_start; j <= j_end; j++)
+				{
+					for(i = i_start - 1; i >= i_start - ghost_width; i--)
+					{
+						if (boundary_levelset(i, j, k) < (double)1e-8)
+						{
+							/*if (phi_real(i + 1, j, k) <= (T)0)
+							{
+								array_for_this(i, j, k) = phi_real(i + 1, j, k) - abs(phi_real(i + 1, j, k) - phi_real(i + 2, j, k));
+							}
+							else
+							{
+								array_for_this(i, j, k) = phi_real(i + 1, j, k) + abs(phi_real(i + 1, j, k) - phi_real(i + 2, j, k));
+							}*/
+							array_for_this(i, j, k) = (T)2*phi_real(i + 1, j, k) - phi_real(i + 2, j, k); 
+						}
+						else
+						{
+							continue;
+						}
+					}
+				}
+			}
+		}
+
+		// Face right
+		if(1 % num_threads == thread_id)
+		{
+			for(k = k_start; k <= k_end; k++)
+			{
+				for(j = j_start; j <= j_end; j++)
+				{
+					for(i = i_end + 1; i <= i_end + ghost_width; i++)
+					{
+						if (boundary_levelset(i, j, k) < (double)1e-8)
+						{
+							/*if (phi_real(i - 1, j, k) <= (T)0)
+							{
+								array_for_this(i, j, k) = phi_real(i - 1, j, k) - abs(phi_real(i - 1, j, k) - phi_real(i - 2, j, k));
+							}
+							else
+							{
+								array_for_this(i, j, k) = phi_real(i - 1, j, k) + abs(phi_real(i - 1, j, k) - phi_real(i - 2, j, k));
+							}*/
+							array_for_this(i, j, k) = (T)2*phi_real(i - 1, j, k) - phi_real(i - 2, j, k); 
+						}
+						else
+						{
+							continue;
+						}
+					}
+				}
+			}
+		}
+
+		multithreading->Sync(thread_id);
+	}
+
 	void FillGhostCellsContinuousDerivativesFrom(const int& thread_id, ARRAY_3D<TT>& phi_real, const bool& copy_real_data)
 	{
 		int i, j, k;
@@ -1895,50 +2172,50 @@ public: // Speedup Functions
 			}
 		}
 
-		// Edge 1 normal to z plane
-		if(6 % num_threads == thread_id)
-		{
-			for(k = k_start; k <= k_end; k++)
-			{
-				for(j = j_start - 1; j >= j_start - ghost_width; j--)
-				{
-					for(i = i_start - 1; i >= i_start - ghost_width; i--)
-					{
-						array_for_this(i, j, k) = (T)0.5*(((T)2*phi_real(i + 1, j, k) - phi_real(i + 2, j, k)) + ((T)2*phi_real(i, j + 1, k) - phi_real(i, j + 2, k)));
-					}
-				}
-			}
-		}
+		//// Edge 1 normal to z plane
+		//if(6 % num_threads == thread_id)
+		//{
+		//	for(k = k_start; k <= k_end; k++)
+		//	{
+		//		for(j = j_start - 1; j >= j_start - ghost_width; j--)
+		//		{
+		//			for(i = i_start - 1; i >= i_start - ghost_width; i--)
+		//			{
+		//				array_for_this(i, j, k) = (T)0.5*(((T)2*phi_real(i + 1, j, k) - phi_real(i + 2, j, k)) + ((T)2*phi_real(i, j + 1, k) - phi_real(i, j + 2, k)));
+		//			}
+		//		}
+		//	}
+		//}
 
-		// Edge 2 normal to z plane
-		if(7 % num_threads == thread_id)
-		{
-			for(k = k_start; k <= k_end; k++)
-			{
-				for(j = j_end + 1; j <= j_end + ghost_width; j++)
-				{
-					for(i = i_end + 1; i <= i_end + ghost_width; i++)
-					{
-						array_for_this(i, j, k) = (T)0.5*(((T)2*phi_real(i - 1, j, k) - phi_real(i - 2, j, k)) + ((T)2*phi_real(i, j - 1, k) - phi_real(i, j - 2, k)));
-					}
-				}
-			}
-		}
+		//// Edge 2 normal to z plane
+		//if(7 % num_threads == thread_id)
+		//{
+		//	for(k = k_start; k <= k_end; k++)
+		//	{
+		//		for(j = j_end + 1; j <= j_end + ghost_width; j++)
+		//		{
+		//			for(i = i_end + 1; i <= i_end + ghost_width; i++)
+		//			{
+		//				array_for_this(i, j, k) = (T)0.5*(((T)2*phi_real(i - 1, j, k) - phi_real(i - 2, j, k)) + ((T)2*phi_real(i, j - 1, k) - phi_real(i, j - 2, k)));
+		//			}
+		//		}
+		//	}
+		//}
 
-		// Edge 3 normal to z plane
-		if(8 % num_threads == thread_id)
-		{
-			for(k = k_start; k <= k_end; k++)
-			{
-				for(j = j_end + 1; j <= j_end + ghost_width; j++)
-				{
-					for(i = i_start - 1; i >= i_start - ghost_width; i--)
-					{
-						array_for_this(i, j, k) = (T)0.5*(((T)2*phi_real(i + 1, j, k) - phi_real(i + 2, j, k)) + ((T)2*phi_real(i, j - 1, k) - phi_real(i, j - 2, k)));
-					}
-				}
-			}
-		}
+		//// Edge 3 normal to z plane
+		//if(8 % num_threads == thread_id)
+		//{
+		//	for(k = k_start; k <= k_end; k++)
+		//	{
+		//		for(j = j_end + 1; j <= j_end + ghost_width; j++)
+		//		{
+		//			for(i = i_start - 1; i >= i_start - ghost_width; i--)
+		//			{
+		//				array_for_this(i, j, k) = (T)0.5*(((T)2*phi_real(i + 1, j, k) - phi_real(i + 2, j, k)) + ((T)2*phi_real(i, j - 1, k) - phi_real(i, j - 2, k)));
+		//			}
+		//		}
+		//	}
+		//}
 
 		//// Edge 4 normal to z plane
 		//if(9 % num_threads == thread_id)
